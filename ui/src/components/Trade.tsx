@@ -3,6 +3,7 @@ import { stringifyAmountValue } from '@agoric/ui-components';
 type TradeProps = {
   makeOffer: () => void;
   withdrawUSDC: () => void;
+  openEmptyPortfolio: () => void;
   istPurse: Purse;
   walletConnected: boolean;
   offerId?: number;
@@ -10,7 +11,7 @@ type TradeProps = {
 };
 
 // Simplified Trade component with only a fixed USDC give amount
-const Trade = ({ makeOffer, withdrawUSDC, walletConnected, offerId, usdcPurse }: TradeProps) => {
+const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, offerId, usdcPurse }: TradeProps) => {
   // Handle making an offer
   const handleMakeOffer = () => {
     makeOffer();
@@ -20,12 +21,18 @@ const Trade = ({ makeOffer, withdrawUSDC, walletConnected, offerId, usdcPurse }:
   const handleWithdraw = () => {
     withdrawUSDC();
   };
+  
+  // Handle opening an empty portfolio
+  const handleOpenEmptyPortfolio = () => {
+    openEmptyPortfolio();
+  };
 
   return (
     <>
       <div className="trade">
-        <h3>Fixed Offer Details</h3>
+        <h3>Offer Options</h3>
         <div className="offer-details">
+          <h4>Option 1: Make Offer with USDC</h4>
           <p>This offer will send exactly <strong>1.10 USDC</strong> to the contract.</p>
           {usdcPurse && (
             <p>
@@ -40,6 +47,10 @@ const Trade = ({ makeOffer, withdrawUSDC, walletConnected, offerId, usdcPurse }:
           )}
           <p>The offer is configured to only include the "give" part without a "want" part.</p>
           <p>After locking funds, you can withdraw using the withdraw button.</p>
+          
+          <h4>Option 2: Open Empty Portfolio</h4>
+          <p>This option will open a new portfolio without requiring any USDC deposit.</p>
+          <p>Use this if you just want to create a portfolio without opening a position.</p>
         </div>
       </div>
       
@@ -47,7 +58,11 @@ const Trade = ({ makeOffer, withdrawUSDC, walletConnected, offerId, usdcPurse }:
         {walletConnected ? (
           <div className="button-group">
             <button onClick={handleMakeOffer}>
-            Make Offer (at least 1.0 USDC)
+              Make Offer (at least 1.0 USDC)
+            </button>
+            
+            <button onClick={handleOpenEmptyPortfolio} className="empty-portfolio-button">
+              Open Empty Portfolio
             </button>
             
             {offerId && (
@@ -99,6 +114,20 @@ const Trade = ({ makeOffer, withdrawUSDC, walletConnected, offerId, usdcPurse }:
         
         .withdraw-button:hover {
           background-color: #3a7bbd;
+        }
+        
+        .empty-portfolio-button {
+          background-color: #5cb85c;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background-color 0.3s;
+        }
+        
+        .empty-portfolio-button:hover {
+          background-color: #4cae4c;
         }
 
         .modal {

@@ -221,6 +221,53 @@ const withdrawUSDC = () => {
   );
 };
 
+const openEmptyPortfolio = () => {
+  const { wallet, offerUpInstance } = useAppStore.getState();
+  if (!offerUpInstance) {
+    alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
+    throw Error('no contract instance');
+  }
+
+  // Generate a unique offerId
+  const offerId = Date.now();
+  // Store the offerId for continuing offers
+  useAppStore.setState({ offerId });
+
+  console.log('Opening empty portfolio with:', {
+    instance: offerUpInstance,
+  });
+
+  wallet?.makeOffer(
+    {
+      source: 'contract',
+      instance: offerUpInstance,
+      publicInvitationMaker: 'makeOpenPortfolioInvitation',
+    },
+    {}, // Empty give - no USDC being provided
+    {}, // No terms needed
+    (update: { status: string; data?: unknown }) => {
+      console.log('Empty portfolio offer update:', update);
+
+      const bigintReplacer = (_k: string, v: any) => typeof v === 'bigint' ? `${v}`: v;
+      const offerDetails = JSON.stringify(update, bigintReplacer, 2);
+
+      if (update.status === 'error') {
+        console.error('Empty portfolio offer error:', update.data);
+        alert(`Empty portfolio offer error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log('Empty portfolio offer accepted:', update.data);
+        alert(`Empty portfolio offer accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log('Empty portfolio offer rejected:', update.data);
+        alert(`Empty portfolio offer rejected: ${offerDetails}`);
+      }
+    },
+    offerId, // Pass the offerId for future reference
+  );
+};
+
 function App() {
   const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
   
@@ -288,26 +335,40 @@ function App() {
         </div>
       </div>
 
-      <div className="card">
-        <Trade
-          makeOffer={makeOffer}
-          withdrawUSDC={withdrawUSDC}
-          istPurse={istPurse as Purse}
-          walletConnected={!!wallet}
-          offerId={offerId}
-          usdcPurse={usdcPurse as Purse}
-        />
-        <hr />
-        {wallet && istPurse ? (
-          <Inventory
-            address={wallet.address}
-            istPurse={istPurse}
-            itemsPurse={itemsPurse as Purse}
+      <div className="app-container">
+        <div className="main-content">
+          <div className="card">          <Trade
+            makeOffer={makeOffer}
+            withdrawUSDC={withdrawUSDC}
+            openEmptyPortfolio={openEmptyPortfolio}
+            istPurse={istPurse as Purse}
+            walletConnected={!!wallet}
+            offerId={offerId}
             usdcPurse={usdcPurse as Purse}
           />
-        ) : (
-          <button onClick={tryConnectWallet}>Connect Wallet</button>
-        )}
+            <hr />
+            {wallet && istPurse ? (
+              <Inventory
+                address={wallet.address}
+                istPurse={istPurse}
+                itemsPurse={itemsPurse as Purse}
+                usdcPurse={usdcPurse as Purse}
+              />
+            ) : (
+              <button onClick={tryConnectWallet}>Connect Wallet</button>
+            )}
+          </div>
+        </div>
+        
+        <div className="chat-sidebar">
+          <h3>Agoric Community Chat</h3>
+          <iframe 
+            src="https://chat.agoric.net/" 
+            title="Agoric Community Chat"
+            className="chat-iframe"
+            sandbox="allow-scripts allow-same-origin allow-forms"
+          ></iframe>
+        </div>
       </div>
     </>
   );
