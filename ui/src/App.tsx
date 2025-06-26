@@ -125,10 +125,17 @@ const makeOffer = () => {
     alert('USDC brand not available');
     throw Error('USDC brand not available');
   }
+  if (!(brands && brands.PoC25)) {
+    alert('PoC25 brand not available');
+    throw Error('PoC25 brand not available');
+  }
 
   // Fixed amount of 1.10 USDC
   const giveValue = 1_100_000n; // Assuming 6 decimal places for USDC
-  const give = { USDN: { brand: brands.USDC, value: giveValue } };
+  const give = {
+    USDN: { brand: brands.USDC, value: giveValue },
+    Access: { brand: brands.PoC25, value: 1n },
+  };
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
@@ -225,10 +232,15 @@ const withdrawUSDC = () => {
 };
 
 const openEmptyPortfolio = () => {
-  const { wallet, offerUpInstance } = useAppStore.getState();
+  const { wallet, offerUpInstance, brands } = useAppStore.getState();
+
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
+  }
+  if (!(brands && brands.PoC25)) {
+    alert('PoC25 brand not available');
+    throw Error('PoC25 brand not available');
   }
 
   // Generate a unique offerId
@@ -246,7 +258,7 @@ const openEmptyPortfolio = () => {
       instance: offerUpInstance,
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
-    {}, // Empty give - no USDC being provided
+    { give: { Access: { brand: brands.PoC25, value: 1n } } }, // no USDN
     {}, // No terms needed
     (update: { status: string; data?: unknown }) => {
       console.log('Empty portfolio offer update:', update);
