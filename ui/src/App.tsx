@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import './App.css';
 import {
@@ -270,9 +270,61 @@ const openEmptyPortfolio = () => {
 
 function App() {
   const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
+  // Ref for chat iframe
+  const chatIframeRef = useRef<HTMLIFrameElement>(null);
   
   useEffect(() => {
     setup();
+    
+    // Prevent iframe scrolling from affecting parent page
+    const handleIframeLoad = () => {
+      if (chatIframeRef.current) {
+        try {
+          // Try to access iframe content if same origin allows it
+          const iframeWindow = chatIframeRef.current.contentWindow;
+          if (iframeWindow) {
+            iframeWindow.addEventListener('scroll', (e) => {
+              e.stopPropagation();
+            });
+            
+            // Attempt to add scroll containment to iframe document if possible
+            iframeWindow.document.body.style.overflow = 'auto';
+            iframeWindow.document.body.style.overscrollBehavior = 'contain';
+          }
+        } catch (e) {
+          // Cross-origin restrictions will likely prevent access
+          console.log('Cannot access iframe content due to cross-origin policy');
+        }
+      }
+    };
+    
+    // Prevent wheel events from propagating outside the chat sidebar
+    const chatSidebar = document.querySelector('.chat-sidebar');
+    const preventPropagation = (e: Event) => {
+      e.stopPropagation();
+    };
+    
+    if (chatSidebar) {
+      chatSidebar.addEventListener('wheel', preventPropagation);
+      chatSidebar.addEventListener('touchmove', preventPropagation);
+    }
+    
+    // Add load event listener to iframe if available
+    if (chatIframeRef.current) {
+      chatIframeRef.current.addEventListener('load', handleIframeLoad);
+    }
+    
+    return () => {
+      // Clean up event listeners
+      if (chatIframeRef.current) {
+        chatIframeRef.current.removeEventListener('load', handleIframeLoad);
+      }
+      
+      if (chatSidebar) {
+        chatSidebar.removeEventListener('wheel', preventPropagation);
+        chatSidebar.removeEventListener('touchmove', preventPropagation);
+      }
+    };
   }, []);
 
   const { wallet, purses, offerId } = useAppStore(
@@ -314,29 +366,36 @@ function App() {
 
   return (
     <>
-      <Logos />
-      <h1>Items Listed on Offer Up</h1>
+      <div style={{ position: 'relative' }}>
+        <Logos />
+        
 
-      <div className="environment-selector">
-        <label htmlFor="environment-select">Environment: </label>
-        <select 
-          id="environment-select" 
-          value={environment} 
-          onChange={handleEnvironmentChange}
-        >
-          <option value="devnet">Devnet</option>
-          <option value="localhost">Localhost</option>
-        </select>
-        <div className="environment-info">
-          <small>
-            RPC: {ENDPOINTS.RPC}<br />
-            API: {ENDPOINTS.API}
-          </small>
+        <div className="environment-selector">
+          <label htmlFor="environment-select">Env: </label>
+          <select 
+            id="environment-select" 
+            value={environment} 
+            onChange={handleEnvironmentChange}
+          >
+            <option value="devnet">Devnet</option>
+            <option value="localhost">Localhost</option>
+          </select>
+          <div className="environment-info">
+            <small>
+              RPC: {ENDPOINTS.RPC}<br />
+              API: {ENDPOINTS.API}
+            </small>
+          </div>
         </div>
       </div>
-
+      
       <div className="app-container">
+        
+          
+        
+
         <div className="main-content">
+        
           <div className="card">          <Trade
             makeOffer={makeOffer}
             withdrawUSDC={withdrawUSDC}
@@ -362,12 +421,15 @@ function App() {
         
         <div className="chat-sidebar">
           <h3>Agoric Community Chat</h3>
-          <iframe 
-            src="https://chat.agoric.net/" 
-            title="Agoric Community Chat"
-            className="chat-iframe"
-            sandbox="allow-scripts allow-same-origin allow-forms"
-          ></iframe>
+          <div className="iframe-container">
+            <iframe 
+              ref={chatIframeRef}
+              src="https://chat.agoric.net/" 
+              title="Agoric Community Chat"
+              className="chat-iframe"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+            ></iframe>
+          </div>
         </div>
       </div>
     </>

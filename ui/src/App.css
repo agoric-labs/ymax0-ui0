@@ -138,18 +138,23 @@ pre {
 }
 
 .environment-selector {
-  margin: 1rem 0;
+  position: absolute;
+  top: 30px;
+  right: 10px;
   padding: 0.5rem;
   background-color: #f5f5f5;
   border-radius: 8px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  max-width: 250px;
+  z-index: 10;
 }
 
 .environment-selector select {
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.7rem;
   border-radius: 4px;
   border: 1px solid #ccc;
   background-color: white;
@@ -166,8 +171,21 @@ pre {
 .environment-info {
   color: #666;
   text-align: left;
-  font-size: 0.8rem;
-  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  display: none;
+}
+
+.environment-selector:hover .environment-info {
+  display: block;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #f5f5f5;
+  padding: 0.5rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  width: 200px;
+  margin-top: 5px;
 }
 
 /* App container with main content and chat sidebar */
@@ -176,11 +194,15 @@ pre {
   gap: 20px;
   margin-top: 20px;
   min-height: 600px;
+  position: relative;
+  isolation: isolate; /* Creates a new stacking context */
 }
 
 .main-content {
   flex: 1;
   min-width: 0; /* Prevents overflow issues in flex */
+  position: relative;
+  z-index: 1;
 }
 
 .chat-sidebar {
@@ -191,6 +213,10 @@ pre {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 600px; /* Fixed height to prevent layout shifts */
+  min-height: 600px;
+  position: relative;
+  z-index: 0; /* Lower z-index than main content */
 }
 
 .chat-sidebar h3 {
@@ -205,7 +231,15 @@ pre {
   flex: 1;
   width: 100%;
   border: none;
-  min-height: 550px;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  word-wrap: break-word; /* Break words to prevent overflow */
+  overflow-wrap: break-word; /* Modern version of word-wrap */
+  transform: scale(0.98); /* Slightly scale down the content to ensure it fits */
+  transform-origin: 0 0; /* Scale from the top-left */
+  height: 100%; /* Fill container height */
+  position: absolute; /* Position absolutely to prevent layout shifts */
+  top: 0;
+  left: 0;
 }
 
 /* Responsive layout */
@@ -218,4 +252,24 @@ pre {
     width: 100%;
     margin-top: 20px;
   }
+}
+
+/* Additional iframe content handling */
+.iframe-container {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  height: 550px; /* Fixed height to prevent layout shifts */
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain; /* Prevent scroll chaining */
+}
+
+.chat-sidebar iframe {
+  width: 100%;
+  height: 100%; /* Fill container height */
+  border: none;
+  overflow-y: auto; /* Allow vertical scrolling inside iframe */
+  scroll-behavior: smooth; /* Smooth scrolling */
+  overscroll-behavior: contain; /* Prevent scroll chaining */
 }
