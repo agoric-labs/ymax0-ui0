@@ -103,7 +103,9 @@ const connectWallet = async () => {
       `Cannot connect to Agoric ${getInitialEnvironment()}. Please check your connection!`,
     );
   }
-  await suggestChain(ENVIRONMENT_CONFIGS[getInitialEnvironment()].NETWORK_CONFIG);
+  await suggestChain(
+    ENVIRONMENT_CONFIGS[getInitialEnvironment()].NETWORK_CONFIG,
+  );
   const wallet = await makeAgoricWalletConnection(watcher, ENDPOINTS.RPC);
   useAppStore.setState({ wallet });
   const { pursesNotifier } = wallet;
@@ -145,11 +147,12 @@ const makeOffer = () => {
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
     { give },
-    { usdnOut: giveValue * 99n / 100n }, // XXX should query
+    { usdnOut: (giveValue * 99n) / 100n }, // XXX should query
     (update: { status: string; data?: unknown }) => {
       console.log('Offer update:', update);
 
-      const bigintReplacer = (_k: string, v: any) => typeof v === 'bigint' ? `${v}`: v;
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
       const offerDetails = JSON.stringify(update, bigintReplacer, 2);
 
       if (update.status === 'error') {
@@ -248,7 +251,8 @@ const openEmptyPortfolio = () => {
     (update: { status: string; data?: unknown }) => {
       console.log('Empty portfolio offer update:', update);
 
-      const bigintReplacer = (_k: string, v: any) => typeof v === 'bigint' ? `${v}`: v;
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
       const offerDetails = JSON.stringify(update, bigintReplacer, 2);
 
       if (update.status === 'error') {
@@ -269,13 +273,15 @@ const openEmptyPortfolio = () => {
 };
 
 function App() {
-  const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
+  const [environment, setEnvironment] = useState<Environment>(
+    getInitialEnvironment(),
+  );
   // Ref for chat iframe
   const chatIframeRef = useRef<HTMLIFrameElement>(null);
-  
+
   useEffect(() => {
     setup();
-    
+
     // Prevent iframe scrolling from affecting parent page
     const handleIframeLoad = () => {
       if (chatIframeRef.current) {
@@ -283,43 +289,45 @@ function App() {
           // Try to access iframe content if same origin allows it
           const iframeWindow = chatIframeRef.current.contentWindow;
           if (iframeWindow) {
-            iframeWindow.addEventListener('scroll', (e) => {
+            iframeWindow.addEventListener('scroll', e => {
               e.stopPropagation();
             });
-            
+
             // Attempt to add scroll containment to iframe document if possible
             iframeWindow.document.body.style.overflow = 'auto';
             iframeWindow.document.body.style.overscrollBehavior = 'contain';
           }
         } catch (e) {
           // Cross-origin restrictions will likely prevent access
-          console.log('Cannot access iframe content due to cross-origin policy');
+          console.log(
+            'Cannot access iframe content due to cross-origin policy',
+          );
         }
       }
     };
-    
+
     // Prevent wheel events from propagating outside the chat sidebar
     const chatSidebar = document.querySelector('.chat-sidebar');
     const preventPropagation = (e: Event) => {
       e.stopPropagation();
     };
-    
+
     if (chatSidebar) {
       chatSidebar.addEventListener('wheel', preventPropagation);
       chatSidebar.addEventListener('touchmove', preventPropagation);
     }
-    
+
     // Add load event listener to iframe if available
     if (chatIframeRef.current) {
       chatIframeRef.current.addEventListener('load', handleIframeLoad);
     }
-    
+
     return () => {
       // Clean up event listeners
       if (chatIframeRef.current) {
         chatIframeRef.current.removeEventListener('load', handleIframeLoad);
       }
-      
+
       if (chatSidebar) {
         chatSidebar.removeEventListener('wheel', preventPropagation);
         chatSidebar.removeEventListener('touchmove', preventPropagation);
@@ -342,13 +350,15 @@ function App() {
     const newEnvironment = e.target.value as Environment;
     setEnvironment(newEnvironment);
     localStorage.setItem('agoricEnvironment', newEnvironment);
-    
+
     // Update endpoints with new environment configuration
     Object.assign(ENDPOINTS, ENVIRONMENT_CONFIGS[newEnvironment]);
-    
+
     // If wallet was connected, disconnect it (refresh required)
     if (wallet) {
-      alert('Environment changed. Please refresh the page to reconnect the wallet with the new environment.');
+      alert(
+        'Environment changed. Please refresh the page to reconnect the wallet with the new environment.',
+      );
     }
   };
 
@@ -368,13 +378,12 @@ function App() {
     <>
       <div style={{ position: 'relative' }}>
         <Logos />
-        
 
         <div className="environment-selector">
           <label htmlFor="environment-select">Env: </label>
-          <select 
-            id="environment-select" 
-            value={environment} 
+          <select
+            id="environment-select"
+            value={environment}
             onChange={handleEnvironmentChange}
           >
             <option value="devnet">Devnet</option>
@@ -382,29 +391,27 @@ function App() {
           </select>
           <div className="environment-info">
             <small>
-              RPC: {ENDPOINTS.RPC}<br />
+              RPC: {ENDPOINTS.RPC}
+              <br />
               API: {ENDPOINTS.API}
             </small>
           </div>
         </div>
       </div>
-      
-      <div className="app-container">
-        
-          
-        
 
+      <div className="app-container">
         <div className="main-content">
-        
-          <div className="card">          <Trade
-            makeOffer={makeOffer}
-            withdrawUSDC={withdrawUSDC}
-            openEmptyPortfolio={openEmptyPortfolio}
-            istPurse={istPurse as Purse}
-            walletConnected={!!wallet}
-            offerId={offerId}
-            usdcPurse={usdcPurse as Purse}
-          />
+          <div className="card">
+            {' '}
+            <Trade
+              makeOffer={makeOffer}
+              withdrawUSDC={withdrawUSDC}
+              openEmptyPortfolio={openEmptyPortfolio}
+              istPurse={istPurse as Purse}
+              walletConnected={!!wallet}
+              offerId={offerId}
+              usdcPurse={usdcPurse as Purse}
+            />
             <hr />
             {wallet && istPurse ? (
               <Inventory
@@ -418,13 +425,13 @@ function App() {
             )}
           </div>
         </div>
-        
+
         <div className="chat-sidebar">
           <h3>Agoric Community Chat</h3>
           <div className="iframe-container">
-            <iframe 
+            <iframe
               ref={chatIframeRef}
-              src="https://chat.agoric.net/" 
+              src="https://chat.agoric.net/"
               title="Agoric Community Chat"
               className="chat-iframe"
               sandbox="allow-scripts allow-same-origin allow-forms"
