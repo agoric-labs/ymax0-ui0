@@ -1,139 +1,144 @@
-import { FormEvent, useState } from 'react';
 import { stringifyAmountValue } from '@agoric/ui-components';
-import scrollIcon from '../assets/scroll.png';
-import istIcon from '../assets/IST.svg';
-import mapIcon from '../assets/map.png';
-import potionIcon from '../assets/potionBlue.png';
-
-const { entries, values } = Object;
-const sum = (xs: bigint[]) => xs.reduce((acc, next) => acc + next, 0n);
-
-const terms = {
-  price: 250000n,
-  maxItems: 3n,
-};
-const nameToIcon = {
-  scroll: scrollIcon,
-  map: mapIcon,
-  potion: potionIcon,
-} as const;
-type ItemName = keyof typeof nameToIcon;
-type ItemChoices = Partial<Record<ItemName, bigint>>;
-
-const parseValue = (numeral: string, purse: Purse): bigint => {
-  const { decimalPlaces } = purse.displayInfo;
-  const num = Number(numeral) * 10 ** decimalPlaces;
-  return BigInt(num);
-};
-
-const Item = ({
-  icon,
-  coinIcon,
-  label,
-  value,
-  onChange,
-  inputClassName,
-  inputStep,
-}: {
-  icon?: string;
-  coinIcon?: string;
-  label: string;
-  value: number | string;
-  onChange: React.ChangeEventHandler<HTMLInputElement>;
-  inputClassName: string;
-  inputStep?: string;
-}) => (
-  <div className="item-col">
-    <label htmlFor={label}>
-      {label.charAt(0).toUpperCase() + label.slice(1)}
-    </label>
-    {icon && <img className="piece" src={icon} title={label} />}
-    {coinIcon && <img className="coin" src={coinIcon} title={label} />}
-    <input
-      title={label}
-      type="number"
-      min="0"
-      max="3"
-      value={value}
-      step={inputStep || '1'}
-      onChange={onChange}
-      className={`trade-input ${inputClassName}`}
-    />
-  </div>
-);
 
 type TradeProps = {
-  makeOffer: (giveValue: bigint, wantChoices: Record<string, bigint>) => void;
+  makeOffer: () => void;
+  withdrawUSDC: () => void;
   istPurse: Purse;
   walletConnected: boolean;
+  offerId?: number;
+  usdcPurse?: Purse;
 };
 
-// TODO: IST displayInfo is available in vbankAsset or boardAux
-const Trade = ({ makeOffer, istPurse, walletConnected }: TradeProps) => {
-  const [giveValue, setGiveValue] = useState(terms.price);
-  const [choices, setChoices] = useState<ItemChoices>({ map: 1n, scroll: 2n });
-  const changeChoice = (ev: FormEvent) => {
-    if (!ev.target) return;
-    const elt = ev.target as HTMLInputElement;
-    const title = elt.title as ItemName;
-    if (!title) return;
-    const qty = BigInt(elt.value);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { [title]: _old, ...rest }: ItemChoices = choices;
-    const newChoices = qty > 0 ? { ...rest, [title]: qty } : rest;
-    setChoices(newChoices);
+// Simplified Trade component with only a fixed USDC give amount
+const Trade = ({ makeOffer, withdrawUSDC, walletConnected, offerId, usdcPurse }: TradeProps) => {
+  // Handle making an offer
+  const handleMakeOffer = () => {
+    makeOffer();
+  };
+
+  // Handle withdrawing USDC
+  const handleWithdraw = () => {
+    withdrawUSDC();
   };
 
   return (
     <>
       <div className="trade">
-        <h3>Want: Choose up to 3 items</h3>
-        <div className="row-center">
-          {entries(nameToIcon).map(([title, icon]) => (
-            <Item
-              key={title}
-              icon={icon}
-              value={Number(choices[title as ItemName] || 0n)}
-              label={title}
-              onChange={changeChoice}
-              inputClassName={
-                sum(values(choices)) <= terms.maxItems ? 'ok' : 'error'
-              }
-            />
-          ))}
+        <h3>Fixed Offer Details</h3>
+        <div className="offer-details">
+          <p>This offer will send exactly <strong>1.10 USDC</strong> to the contract.</p>
+          {usdcPurse && (
+            <p>
+              Your current USDC balance: <strong>
+                {stringifyAmountValue(
+                  usdcPurse.currentAmount,
+                  usdcPurse.displayInfo.assetKind,
+                  usdcPurse.displayInfo.decimalPlaces,
+                )}
+              </strong>
+            </p>
+          )}
+          <p>The offer is configured to only include the "give" part without a "want" part.</p>
+          <p>After locking funds, you can withdraw using the withdraw button.</p>
         </div>
       </div>
-      <div className="trade">
-        <h3>Give: Offer at least 0.25 IST</h3>
-        <div className="row-center">
-          <Item
-            key="IST"
-            coinIcon={istIcon}
-            value={
-              istPurse
-                ? stringifyAmountValue(
-                    { ...istPurse.currentAmount, value: giveValue },
-                    istPurse.displayInfo.assetKind,
-                    istPurse.displayInfo.decimalPlaces,
-                  )
-                : '0.25'
-            }
-            label="IST"
-            onChange={ev =>
-              setGiveValue(parseValue(ev?.target?.value, istPurse))
-            }
-            inputClassName={giveValue >= terms.price ? 'ok' : 'error'}
-            inputStep="0.01"
-          />
-        </div>
-      </div>
-      <div>
-        {walletConnected && (
-          <button onClick={() => makeOffer(giveValue, choices)}>
-            Make an Offer
-          </button>
+      
+      <div className="offer-actions">
+        {walletConnected ? (
+          <div className="button-group">
+            <button onClick={handleMakeOffer}>
+            Make Offer (at least 1.0 USDC)
+            </button>
+            
+            {offerId && (
+              <button 
+                onClick={handleWithdraw} 
+                className="withdraw-button"
+              >
+                Withdraw USDC
+              </button>
+            )}
+          </div>
+        ) : (
+          <p>Please connect your wallet to make an offer.</p>
         )}
       </div>
+
+      <style>{`
+        .offer-details {
+          background-color: #f5f5f5;
+          border: 1px solid #ddd;
+          border-radius: 5px;
+          padding: 15px;
+          margin-bottom: 20px;
+        }
+        
+        .offer-details p {
+          margin: 8px 0;
+        }
+        
+        .offer-actions {
+          margin-top: 20px;
+        }
+        
+        .button-group {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        
+        .withdraw-button {
+          background-color: #4a90e2;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background-color 0.3s;
+        }
+        
+        .withdraw-button:hover {
+          background-color: #3a7bbd;
+        }
+
+        .modal {
+          display: block;
+          position: fixed;
+          z-index: 1;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+          background-color: #fefefe;
+          margin: 15% auto;
+          padding: 20px;
+          border: 1px solid #888;
+          width: 80%;
+          max-width: 600px;
+          border-radius: 5px;
+        }
+        
+        .close {
+          color: #aaa;
+          float: right;
+          font-size: 28px;
+          font-weight: bold;
+          cursor: pointer;
+        }
+        
+        pre {
+          background-color: #f8f8f8;
+          border: 1px solid #ddd;
+          border-radius: 3px;
+          padding: 10px;
+          overflow: auto;
+          max-height: 400px;
+        }
+      `}</style>
     </>
   );
 };

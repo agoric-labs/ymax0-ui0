@@ -1,12 +1,11 @@
 {
-  "name": "offer-up",
+  "name": "ymax0-ui0",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "private": true,
   "packageManager": "yarn@4.7.0",
   "useWorkspaces": true,
   "workspaces": [
-    "contract",
     "ui"
   ],
   "resolutions-note": "work-around for https://github.com/Agoric/agoric-sdk/issues/8621",
@@ -39,18 +38,12 @@
     "@babel/highlight": "7.22.5"
   },
   "scripts": {
-    "start:docker": "cd contract && docker compose up -d",
-    "docker:logs": "cd contract; docker compose logs --tail 200 -f",
-    "docker:bash": "cd contract; docker compose exec agd bash",
-    "docker:make": "cd contract; docker compose exec agd make -C /workspace/contract",
-    "make:help": "make -C contract list",
-    "start:contract": "cd contract && yarn start",
+    "su": "cd ui && yarn dev",
     "start:ui": "cd ui && yarn dev",
     "lint": "yarn workspaces foreach --all run lint",
     "test": "yarn workspaces foreach --all run test",
     "test:e2e": "yarn workspace offer-up-ui test:e2e",
-    "build": "yarn workspaces foreach --all run build",
-    "runWaitForBlocks": "cd contract && yarn make:waitForBlocks"
+    "build": "yarn workspaces foreach --all run build"
   },
   "dependencies": {
     "eslint": "^8.57.0"
