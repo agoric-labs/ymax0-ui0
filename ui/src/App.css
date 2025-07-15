@@ -273,3 +273,59 @@ pre {
   scroll-behavior: smooth; /* Smooth scrolling */
   overscroll-behavior: contain; /* Prevent scroll chaining */
 }
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.chat-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.chat-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.chat-toggle input {
+  margin-right: 6px;
+  width: auto;
+  cursor: pointer;
+}
+
+.toggle-label {
+  color: #0066cc;
+  font-weight: 500;
+}
+
+.chat-disabled-message {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 20px;
+  background-color: #f8f8f8;
+  color: #666;
+  text-align: center;
+  min-height: 200px;
+}
+
+.chat-disabled-message p {
+  margin: 10px 0;
+  font-size: 0.9rem;
+}
+
+.chat-disabled-message p:first-child {
+  font-weight: bold;
+  color: #444;
+}
