@@ -11,7 +11,14 @@ type TradeProps = {
 };
 
 // Simplified Trade component with only a fixed USDC give amount
-const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, offerId, usdcPurse }: TradeProps) => {
+const Trade = ({
+  makeOffer,
+  withdrawUSDC,
+  openEmptyPortfolio,
+  walletConnected,
+  offerId,
+  usdcPurse,
+}: TradeProps) => {
   // Handle making an offer
   const handleMakeOffer = () => {
     makeOffer();
@@ -21,7 +28,7 @@ const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, o
   const handleWithdraw = () => {
     withdrawUSDC();
   };
-  
+
   // Handle opening an empty portfolio
   const handleOpenEmptyPortfolio = () => {
     openEmptyPortfolio();
@@ -33,10 +40,14 @@ const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, o
         <h3>Offer Options</h3>
         <div className="offer-details">
           <h4>Option 1: Make Offer with USDC</h4>
-          <p>This offer will send exactly <strong>1.10 USDC</strong> to the contract.</p>
+          <p>
+            This offer will send exactly <strong>1.10 USDC</strong> to the
+            contract.
+          </p>
           {usdcPurse && (
             <p>
-              Your current USDC balance: <strong>
+              Your current USDC balance:{' '}
+              <strong>
                 {stringifyAmountValue(
                   usdcPurse.currentAmount,
                   usdcPurse.displayInfo.assetKind,
@@ -45,31 +56,42 @@ const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, o
               </strong>
             </p>
           )}
-          <p>The offer is configured to only include the "give" part without a "want" part.</p>
-          <p>After locking funds, you can withdraw using the withdraw button.</p>
-          
+          <p>
+            The offer is configured to only include the "give" part without a
+            "want" part.
+          </p>
+          <p>
+            After locking funds, you can withdraw using the withdraw button.
+          </p>
+
           <h4>Option 2: Open Empty Portfolio</h4>
-          <p>This option will open a new portfolio without requiring any USDC deposit.</p>
-          <p>Use this if you just want to create a portfolio without opening a position.</p>
+          <p>
+            This option will open a new portfolio without requiring any USDC
+            deposit.
+          </p>
+          <p>
+            Use this if you just want to create a portfolio without opening a
+            position.
+          </p>
         </div>
       </div>
-      
+
       <div className="offer-actions">
         {walletConnected ? (
           <div className="button-group">
             <button onClick={handleMakeOffer}>
               Make Offer (at least 1.0 USDC)
             </button>
-            
-            <button onClick={handleOpenEmptyPortfolio} className="empty-portfolio-button">
+
+            <button
+              onClick={handleOpenEmptyPortfolio}
+              className="empty-portfolio-button"
+            >
               Open Empty Portfolio
             </button>
-            
+
             {offerId && (
-              <button 
-                onClick={handleWithdraw} 
-                className="withdraw-button"
-              >
+              <button onClick={handleWithdraw} className="withdraw-button">
                 Withdraw USDC
               </button>
             )}
@@ -81,7 +103,6 @@ const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, o
 
       <style>{`
         .offer-details {
-          background-color: #f5f5f5;
           border: 1px solid #ddd;
           border-radius: 5px;
           padding: 15px;
@@ -142,7 +163,6 @@ const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, o
         }
         
         .modal-content {
-          background-color: #fefefe;
           margin: 15% auto;
           padding: 20px;
           border: 1px solid #888;
@@ -167,6 +187,16 @@ const Trade = ({ makeOffer, withdrawUSDC, openEmptyPortfolio, walletConnected, o
           overflow: auto;
           max-height: 400px;
         }
+
+        @media (prefers-color-scheme: light) {
+          .offer-details {
+            background-color: #f5f5f5;
+          }
+          .modal-content {
+            background-color: #fefefe;
+          }
+        }
+
       `}</style>
     </>
   );
