@@ -14,6 +14,7 @@ import { subscribeLatest } from '@agoric/notifier';
 import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
+import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
 
 const { fromEntries } = Object;
 
@@ -131,15 +132,18 @@ const makeOffer = () => {
   }
 
   // Fixed amount of 1.10 USDC
-  const giveValue = 1_100_000n; // Assuming 6 decimal places for USDC
-  const give = {
-    USDN: { brand: brands.USDC, value: giveValue },
-    Access: { brand: brands.PoC26, value: 1n },
-  };
+  const unit = 1_100_000n; // USDC has 6 decimal places
+  const giveValue = (unit * 1_10n) / 1_00n;
+
+  const { give, steps } = makePortfolioSteps(
+    { USDN: { brand: brands.USDC as Brand<'nat'>, value: giveValue } },
+    // XXX should query
+    { detail: { usdnOut: (giveValue * 99n) / 100n } },
+  );
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
-    give,
+    give: { ...give, Access: { brand: brands.PoC26, value: 1n } },
   });
 
   // Generate a unique offerId
@@ -154,7 +158,7 @@ const makeOffer = () => {
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
     { give },
-    { usdnOut: (giveValue * 99n) / 100n }, // XXX should query
+    { flow: steps },
     (update: { status: string; data?: unknown }) => {
       console.log('Offer update:', update);
 
@@ -180,7 +184,7 @@ const makeOffer = () => {
 };
 
 const withdrawUSDC = () => {
-  const { wallet, offerUpInstance, offerId } = useAppStore.getState();
+  const { wallet, offerUpInstance, offerId, brands } = useAppStore.getState();
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
@@ -191,11 +195,28 @@ const withdrawUSDC = () => {
     return;
   }
 
+  if (!(brands && brands.USDC)) {
+    alert('USDC brand not available');
+    throw Error('USDC brand not available');
+  }
+
+  const proposal = {
+    // TODO: hardcoded for testing
+    want: { Cash: { brand: brands.USDC as Brand<'nat'>, value: 300n } },
+  };
+
   console.log('Making continuing offer with:', {
     previousOffer: offerId,
     instance: offerUpInstance,
+    proposal,
   });
 
+  const amount = proposal.want.Cash;
+  const steps: MovementDesc[] = [
+    { src: 'USDN', dest: '@noble', amount },
+    { src: '@noble', dest: '@agoric', amount },
+    { src: '@agoric', dest: '<Cash>', amount },
+  ];
   wallet?.makeOffer(
     {
       source: 'continuing',
@@ -208,8 +229,8 @@ const withdrawUSDC = () => {
         gas: 400000,
       },
     },
-    {}, // No assets being exchanged in this follow-up offer
-    { amountValue: 300n }, // TODO: hardcoded for testing
+    proposal,
+    { flow: steps },
     (update: { status: string; data?: unknown }) => {
       console.log('Withdraw offer update:', update);
 
