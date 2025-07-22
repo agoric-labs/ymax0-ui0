@@ -117,18 +117,48 @@ const connectWallet = async () => {
 };
 
 const makeOffer = () => {
-  const { wallet, offerUpInstance, brands } = useAppStore.getState();
+  const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
   }
-  if (!(brands && brands.USDC)) {
-    alert('USDC brand not available');
-    throw Error('USDC brand not available');
+
+  // Get USDC brand from purses
+  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
+  // XXX: Remove this once the issue is fixed
+  const getUsdcBrand = () => {
+    if (!purses) return null;
+
+    // Look for USDC purse in the purses
+    const usdcPurse = purses.find(
+      purse => purse.brandPetname?.toLowerCase() === 'usdc',
+    );
+
+    return usdcPurse?.brand;
+  };
+  const usdcBrand = getUsdcBrand();
+  if (!usdcBrand) {
+    alert('Required brand (USDC) is not available in purses.');
+    return;
   }
-  if (!(brands && brands.PoC26)) {
-    alert('PoC26 brand not available');
-    throw Error('PoC26 brand not available');
+
+  // Get PoC26 brand from purses
+  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
+  // XXX: Remove this once the issue is fixed
+  const getPoc26Brand = () => {
+    if (!purses) return null;
+
+    // Look for PoC26 purse in the purses
+    const poc26Purse = purses.find(
+      purse => purse.brandPetname?.toLowerCase() === 'poc26',
+    );
+
+    return poc26Purse?.brand;
+  };
+  const poc26Brand = getPoc26Brand();
+  if (!poc26Brand) {
+    alert('Required brand (PoC26) is not available in purses.');
+    return;
   }
 
   // Fixed amount of 1.10 USDC
@@ -136,14 +166,17 @@ const makeOffer = () => {
   const giveValue = (unit * 1_10n) / 1_00n;
 
   const { give, steps } = makePortfolioSteps(
-    { USDN: { brand: brands.USDC as Brand<'nat'>, value: giveValue } },
+    { USDN: { brand: usdcBrand as Brand<'nat'>, value: giveValue } },
     // XXX should query
     { detail: { usdnOut: (giveValue * 99n) / 100n } },
   );
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
-    give: { ...give, Access: { brand: brands.PoC26, value: 1n } },
+    give: {
+      ...give,
+      Access: { brand: poc26Brand, value: 1n },
+    },
   });
 
   // Generate a unique offerId
@@ -157,7 +190,12 @@ const makeOffer = () => {
       instance: offerUpInstance,
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
-    { give },
+    {
+      give: {
+        ...give,
+        Access: { brand: poc26Brand, value: 1n },
+      },
+    },
     { flow: steps },
     (update: { status: string; data?: unknown }) => {
       console.log('Offer update:', update);
@@ -184,7 +222,7 @@ const makeOffer = () => {
 };
 
 const withdrawUSDC = () => {
-  const { wallet, offerUpInstance, offerId, brands } = useAppStore.getState();
+  const { wallet, offerUpInstance, offerId, purses } = useAppStore.getState();
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
@@ -195,14 +233,28 @@ const withdrawUSDC = () => {
     return;
   }
 
-  if (!(brands && brands.USDC)) {
-    alert('USDC brand not available');
-    throw Error('USDC brand not available');
+  // Get USDC brand from purses
+  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
+  // XXX: Remove this once the issue is fixed
+  const getUsdcBrand = () => {
+    if (!purses) return null;
+
+    // Look for USDC purse in the purses
+    const usdcPurse = purses.find(
+      purse => purse.brandPetname?.toLowerCase() === 'usdc',
+    );
+
+    return usdcPurse?.brand;
+  };
+  const usdcBrand = getUsdcBrand();
+  if (!usdcBrand) {
+    alert('Required brand (USDC) is not available in purses.');
+    return;
   }
 
   const proposal = {
     // TODO: hardcoded for testing
-    want: { Cash: { brand: brands.USDC as Brand<'nat'>, value: 300n } },
+    want: { Cash: { brand: usdcBrand as Brand<'nat'>, value: 300n } },
   };
 
   console.log('Making continuing offer with:', {
@@ -253,15 +305,30 @@ const withdrawUSDC = () => {
 };
 
 const openEmptyPortfolio = () => {
-  const { wallet, offerUpInstance, brands } = useAppStore.getState();
+  const { wallet, offerUpInstance, purses } = useAppStore.getState();
 
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
   }
-  if (!(brands && brands.PoC26)) {
-    alert('PoC26 brand not available');
-    throw Error('PoC26 brand not available');
+
+  // Get brand from purses
+  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
+  // XXX: Remove this once the issue is fixed
+  const getPoc26Brand = () => {
+    if (!purses) return null;
+
+    // Look for PoC26 purse in the purses
+    const poc26Purse = purses.find(
+      purse => purse.brandPetname?.toLowerCase() === 'poc26',
+    );
+
+    return poc26Purse?.brand;
+  };
+  const poc26Brand = getPoc26Brand();
+  if (!poc26Brand) {
+    alert('Required brand (PoC26) is not available in purses.');
+    return;
   }
 
   // Generate a unique offerId
@@ -279,7 +346,7 @@ const openEmptyPortfolio = () => {
       instance: offerUpInstance,
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
-    { give: { Access: { brand: brands.PoC26, value: 1n } } }, // no USDN
+    { give: { Access: { brand: poc26Brand, value: 1n } } }, // no USDN
     {}, // No terms needed
     (update: { status: string; data?: unknown }) => {
       console.log('Empty portfolio offer update:', update);
