@@ -13,20 +13,17 @@ import {
 import { subscribeLatest } from '@agoric/notifier';
 import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
-import { Trade, PositionType } from './components/Trade';
+import { Trade } from './components/Trade';
 import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
+import { getBrand } from './utils';
+import type {
+  Environment,
+  EndpointConfig,
+  AppState,
+  YieldProtocol,
+} from './types';
 
 const { fromEntries } = Object;
-
-type Wallet = Awaited<ReturnType<typeof makeAgoricWalletConnection>>;
-
-type Environment = 'devnet' | 'localhost';
-
-interface EndpointConfig {
-  RPC: string;
-  API: string;
-  NETWORK_CONFIG: string;
-}
 
 const ENVIRONMENT_CONFIGS: Record<Environment, EndpointConfig> = {
   devnet: {
@@ -63,15 +60,6 @@ if (codeSpaceHostName && codeSpaceDomain) {
   console.log(`Using ${getInitialEnvironment()} endpoints:`, ENDPOINTS);
 }
 const watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, 'agoricdev-25');
-
-interface AppState {
-  wallet?: Wallet;
-  offerUpInstance?: unknown;
-  brands?: Record<string, unknown>;
-  purses?: Array<Purse>;
-  offerId?: number;
-  positionType?: PositionType;
-}
 
 const useAppStore = create<AppState>(() => ({}));
 
@@ -120,7 +108,7 @@ const connectWallet = async () => {
 const makeOffer = (
   usdcAmount: bigint = 1_250_000n,
   bldFeeAmount: bigint = 20_000_000n,
-  positionType: PositionType = 'Aave',
+  yProtocol: YieldProtocol = 'Aave',
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -128,58 +116,19 @@ const makeOffer = (
     throw Error('no contract instance');
   }
 
-  // Get USDC brand from purses
-  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
-  // XXX: Remove this once the issue is fixed
-  const getUsdcBrand = () => {
-    if (!purses) return null;
-
-    // Look for USDC purse in the purses
-    const usdcPurse = purses.find(
-      purse => purse.brandPetname?.toLowerCase() === 'usdc',
-    );
-
-    return usdcPurse?.brand;
-  };
-  const usdcBrand = getUsdcBrand();
+  const usdcBrand = getBrand(purses, 'usdc');
   if (!usdcBrand) {
     alert('Required brand (USDC) is not available in purses.');
     return;
   }
 
-  // Get PoC26 brand from purses
-  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
-  // XXX: Remove this once the issue is fixed
-  const getPoc26Brand = () => {
-    if (!purses) return null;
-
-    // Look for PoC26 purse in the purses
-    const poc26Purse = purses.find(
-      purse => purse.brandPetname?.toLowerCase() === 'poc26',
-    );
-
-    return poc26Purse?.brand;
-  };
-  const poc26Brand = getPoc26Brand();
+  const poc26Brand = getBrand(purses, 'poc26');
   if (!poc26Brand) {
     alert('Required brand (PoC26) is not available in purses.');
     return;
   }
 
-  // Get BLD brand from purses
-  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
-  // XXX: Remove this once the issue is fixed
-  const getBLDBrand = () => {
-    if (!purses) return null;
-
-    // Look for BLD purse in the purses
-    const bldPurse = purses.find(
-      purse => purse.brandPetname?.toLowerCase() === 'bld',
-    );
-
-    return bldPurse?.brand;
-  };
-  const BLDBrand = getBLDBrand();
+  const BLDBrand = getBrand(purses, 'bld');
   if (!BLDBrand) {
     alert('Required brand (BLD) is not available in purses.');
     return;
@@ -190,18 +139,17 @@ const makeOffer = (
 
   // Create position object based on selected type
   const position: Record<string, { brand: Brand<'nat'>; value: bigint }> = {};
-  position[positionType] = {
+  position[yProtocol] = {
     brand: usdcBrand as Brand<'nat'>,
     value: giveValue,
   };
 
   const { give, steps } = makePortfolioSteps(position, {
+    evm: 'Avalanche',
     feeBrand: BLDBrand as Brand<'nat'>,
     feeBasisPoints: bldFeeAmount,
     detail:
-      positionType === 'USDN'
-        ? { usdnOut: (giveValue * 99n) / 100n }
-        : undefined,
+      yProtocol === 'USDN' ? { usdnOut: (giveValue * 99n) / 100n } : undefined,
   });
 
   console.log('Making offer with:', {
@@ -215,7 +163,7 @@ const makeOffer = (
   // Generate a unique offerId
   const offerId = Date.now();
   // Store the offerId and position type for continuing offers
-  useAppStore.setState({ offerId, positionType });
+  useAppStore.setState({ offerId, yProtocol });
 
   wallet?.makeOffer(
     {
@@ -266,20 +214,7 @@ const withdrawUSDC = () => {
     return;
   }
 
-  // Get USDC brand from purses
-  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
-  // XXX: Remove this once the issue is fixed
-  const getUsdcBrand = () => {
-    if (!purses) return null;
-
-    // Look for USDC purse in the purses
-    const usdcPurse = purses.find(
-      purse => purse.brandPetname?.toLowerCase() === 'usdc',
-    );
-
-    return usdcPurse?.brand;
-  };
-  const usdcBrand = getUsdcBrand();
+  const usdcBrand = getBrand(purses, 'usdc');
   if (!usdcBrand) {
     alert('Required brand (USDC) is not available in purses.');
     return;
@@ -297,10 +232,10 @@ const withdrawUSDC = () => {
   });
 
   const amount = proposal.want.Cash;
-  const { positionType = 'USDN' } = useAppStore.getState();
+  const { yProtocol = 'USDN' } = useAppStore.getState();
 
   const steps: MovementDesc[] = [
-    { src: positionType, dest: '@noble', amount },
+    { src: yProtocol, dest: '@noble', amount },
     { src: '@noble', dest: '@agoric', amount },
     { src: '@agoric', dest: '<Cash>', amount },
   ];
@@ -347,20 +282,7 @@ const openEmptyPortfolio = () => {
     throw Error('no contract instance');
   }
 
-  // Get brand from purses
-  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
-  // XXX: Remove this once the issue is fixed
-  const getPoc26Brand = () => {
-    if (!purses) return null;
-
-    // Look for PoC26 purse in the purses
-    const poc26Purse = purses.find(
-      purse => purse.brandPetname?.toLowerCase() === 'poc26',
-    );
-
-    return poc26Purse?.brand;
-  };
-  const poc26Brand = getPoc26Brand();
+  const poc26Brand = getBrand(purses, 'poc26');
   if (!poc26Brand) {
     alert('Required brand (PoC26) is not available in purses.');
     return;
@@ -539,8 +461,8 @@ function App() {
           <div className="card">
             {' '}
             <Trade
-              makeOffer={(usdcAmount, bldFeeAmount, positionType) =>
-                makeOffer(usdcAmount, bldFeeAmount, positionType)
+              makeOffer={(usdcAmount, bldFeeAmount, yProtocol) =>
+                makeOffer(usdcAmount, bldFeeAmount, yProtocol)
               }
               withdrawUSDC={withdrawUSDC}
               openEmptyPortfolio={openEmptyPortfolio}

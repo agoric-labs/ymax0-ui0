@@ -1,14 +1,13 @@
 import { stringifyAmountValue } from '@agoric/ui-components';
 import { useState } from 'react';
-
-// Define position types
-export type PositionType = 'USDN' | 'Aave';
+import { YieldProtocol, EVMChain } from '../ymax-client';
 
 type TradeProps = {
   makeOffer: (
     usdcAmount: bigint,
     bldFeeAmount: bigint,
-    positionType: PositionType,
+    yieldProtocol: YieldProtocol,
+    evmChain?: EVMChain,
   ) => void;
   withdrawUSDC: () => void;
   openEmptyPortfolio: () => void;
@@ -30,7 +29,8 @@ const Trade = ({
   // Default to 1.25 USDC and 20 BLD
   const [usdcAmount, setUsdcAmount] = useState<string>('1.25');
   const [bldFeeAmount, setBldFeeAmount] = useState<string>('20');
-  const [positionType, setPositionType] = useState<PositionType>('Aave');
+  const [yieldProtocol, setYieldProtocol] = useState<YieldProtocol>('Aave');
+  const [evmChain, setEvmChain] = useState<EVMChain>('Avalanche');
 
   // Handle making an offer
   const handleMakeOffer = () => {
@@ -38,9 +38,19 @@ const Trade = ({
     const usdcValue = BigInt(Math.floor(parseFloat(usdcAmount) * 1_000_000));
 
     // Convert BLD fee amount to bigint (BLD has 6 decimal places)
-    const bldValue = BigInt(Math.floor(parseFloat(bldFeeAmount) * 1_000_000));
+    // For USDN protocol, no fee is required, so pass 0
+    const bldValue =
+      yieldProtocol === 'USDN'
+        ? 0n
+        : BigInt(Math.floor(parseFloat(bldFeeAmount) * 1_000_000));
 
-    makeOffer(usdcValue, bldValue, positionType);
+    // Only pass the EVM chain if Aave or Compound is selected
+    const evmChainParam =
+      yieldProtocol === 'Aave' || yieldProtocol === 'Compound'
+        ? evmChain
+        : undefined;
+
+    makeOffer(usdcValue, bldValue, yieldProtocol, evmChainParam);
   };
 
   // Handle withdrawing USDC
@@ -54,7 +64,7 @@ const Trade = ({
   };
 
   return (
-    <>
+    <div className="trade-container">
       <div className="page-header">
         <h1>ymax-dev-ui</h1>
       </div>
@@ -87,35 +97,67 @@ const Trade = ({
                 value={bldFeeAmount}
                 onChange={e => setBldFeeAmount(e.target.value)}
                 placeholder="Enter BLD fee amount"
+                disabled={yieldProtocol === 'USDN'}
               />
+              {yieldProtocol === 'USDN' && (
+                <small className="fee-info">
+                  No fee required for USDN protocol
+                </small>
+              )}
             </div>
           </div>
 
           <div className="input-group position-select">
-            <label>Position Type:</label>
+            <label>Yield Protocol:</label>
             <div className="radio-group">
               <label className="radio-label">
                 <input
                   type="radio"
-                  name="positionType"
+                  name="yieldProtocol"
                   value="USDN"
-                  checked={positionType === 'USDN'}
-                  onChange={() => setPositionType('USDN')}
+                  checked={yieldProtocol === 'USDN'}
+                  onChange={() => setYieldProtocol('USDN')}
                 />
                 USDN
               </label>
               <label className="radio-label">
                 <input
                   type="radio"
-                  name="positionType"
+                  name="yieldProtocol"
                   value="Aave"
-                  checked={positionType === 'Aave'}
-                  onChange={() => setPositionType('Aave')}
+                  checked={yieldProtocol === 'Aave'}
+                  onChange={() => setYieldProtocol('Aave')}
                 />
                 Aave
               </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="yieldProtocol"
+                  value="Compound"
+                  checked={yieldProtocol === 'Compound'}
+                  onChange={() => setYieldProtocol('Compound')}
+                />
+                Compound
+              </label>
             </div>
           </div>
+
+          {/* EVM Chain Selector - only visible when Aave or Compound is selected */}
+          {(yieldProtocol === 'Aave' || yieldProtocol === 'Compound') && (
+            <div className="chain-select">
+              <label htmlFor="evm-chain">EVM Chain:</label>
+              <select
+                id="evm-chain"
+                value={evmChain}
+                onChange={e => setEvmChain(e.target.value as EVMChain)}
+                className="chain-selector"
+              >
+                <option value="Avalanche">Avalanche</option>
+                <option value="Arbitrum">Arbitrum</option>
+              </select>
+            </div>
+          )}
 
           {usdcPurse && (
             <div className="balance-display">
@@ -136,9 +178,9 @@ const Trade = ({
               The offer is configured to only include the "give" part without a
               "want" part.
             </p>
-            <p>
+            {/* <p>
               After locking funds, you can withdraw using the withdraw button.
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -179,7 +221,7 @@ const Trade = ({
           <p>Please connect your wallet to make an offer.</p>
         )}
       </div>
-    </>
+    </div>
   );
 };
 

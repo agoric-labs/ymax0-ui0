@@ -2,14 +2,24 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: var(--space-sm);
+  padding-top: 0.5rem; /* Reduced top padding */
   text-align: center;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* New trade container styling to reduce empty space */
+.trade-container {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0;
+  width: 100%;
+}
+
 .page-header {
-  margin-bottom: -0.5rem;
+  margin: 0;
+  padding: 0.5rem 0;
   width: 100%;
 }
 
@@ -19,6 +29,7 @@
   text-align: center;
   font-weight: 700;
   letter-spacing: -0.5px;
+  margin: 0;
 }
 
 .logo {
@@ -123,14 +134,36 @@ input:hover {
   box-shadow: var(--shadow-md);
 }
 
+input:disabled {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+input:disabled:hover {
+  border-color: var(--color-border);
+  box-shadow: none;
+  transform: none;
+}
+
+.fee-info {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
 .error {
-  background-color: #E11D48;
+  background-color: #e11d48;
   color: #fff;
 }
 
 /* increment/decrement arrows always visible */
-input[type=number]::-webkit-inner-spin-button {
-  opacity: 1
+input[type='number']::-webkit-inner-spin-button {
+  opacity: 1;
 }
 
 .offer-details {
@@ -178,7 +211,7 @@ pre {
   flex-direction: row;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   max-width: 250px;
   z-index: 10;
 }
@@ -210,7 +243,7 @@ pre {
   right: 0;
   padding: 0.5rem;
   border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   width: 200px;
   margin-top: 5px;
 }
@@ -230,7 +263,9 @@ pre {
   min-width: 0; /* Prevents overflow issues in flex */
   position: relative;
   z-index: 1;
-  margin-right: var(--space-md); /* Add some space between main content and sidebar */
+  margin-right: var(
+    --space-md
+  ); /* Add some space between main content and sidebar */
 }
 
 .chat-sidebar {
@@ -244,6 +279,10 @@ pre {
   flex: 0 0 auto; /* Don't grow, don't shrink, use explicit width */
   position: relative;
   z-index: 0; /* Lower z-index than main content */
+  height: calc(100vh - 120px); /* Dynamic height based on viewport height */
+  max-height: calc(
+    100vh - 120px
+  ); /* Ensure it doesn't go beyond the viewport */
 }
 
 .chat-sidebar h3 {
@@ -261,7 +300,9 @@ pre {
   overflow-x: hidden; /* Prevent horizontal scrolling */
   word-wrap: break-word; /* Break words to prevent overflow */
   overflow-wrap: break-word; /* Modern version of word-wrap */
-  transform: scale(0.98); /* Slightly scale down the content to ensure it fits */
+  transform: scale(
+    0.98
+  ); /* Slightly scale down the content to ensure it fits */
   transform-origin: 0 0; /* Scale from the top-left */
   height: 100%; /* Fill container height */
   position: absolute; /* Position absolutely to prevent layout shifts */
@@ -274,39 +315,49 @@ pre {
   #root {
     padding: var(--space-xs);
   }
-  
+
   .app-container {
     flex-direction: column;
     gap: var(--space-md);
     margin-top: var(--space-sm);
   }
-  
+
   .chat-sidebar {
     width: 100%;
-    max-height: 400px;
+    height: auto;
+    max-height: min(
+      400px,
+      calc(100vh - 350px)
+    ); /* Responsive height for mobile */
   }
-  
+
   .trade {
     padding: var(--space-md);
   }
-  
+
   .input-row {
     flex-direction: column;
     gap: var(--space-sm);
   }
-  
+
   .input-group {
     margin: var(--space-xs) 0;
   }
-  
+
   .radio-group {
-    gap: var(--space-md);
+    gap: var(--space-sm);
+    justify-content: center;
   }
-  
+
+  .chain-select {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .options-container {
     flex-direction: column;
   }
-  
+
   .option-card {
     margin-bottom: var(--space-md);
   }
@@ -317,7 +368,8 @@ pre {
   position: relative;
   flex: 1;
   overflow: hidden;
-  height: 550px; /* Fixed height to prevent layout shifts */
+  height: calc(100vh - 120px); /* Dynamic height based on viewport height */
+  max-height: calc(100vh - 120px); /* Ensure it doesn't exceed viewport */
   display: flex;
   flex-direction: column;
   overscroll-behavior: contain; /* Prevent scroll chaining */
@@ -327,9 +379,10 @@ pre {
   width: 100%;
   height: 100%; /* Fill container height */
   border: none;
-  overflow-y: auto; /* Allow vertical scrolling inside iframe */
+  overflow-y: auto; /* Allow vertical scrolling inside iframe only */
   scroll-behavior: smooth; /* Smooth scrolling */
   overscroll-behavior: contain; /* Prevent scroll chaining */
+  max-height: 100%; /* Ensure iframe respects parent height */
 }
 
 /* Additional modern styling for enhanced UX */
@@ -347,7 +400,12 @@ pre {
   box-shadow: var(--shadow-lg);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--color-text-primary);
   font-weight: 600;
 }
@@ -435,10 +493,50 @@ pre {
   margin-top: var(--space-md);
 }
 
+.chain-select {
+  margin-top: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.chain-select label {
+  margin-bottom: 0;
+  min-width: 80px;
+}
+
+.chain-selector {
+  width: auto;
+  min-width: 140px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  appearance: auto;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.chain-selector:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.chain-selector:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
 .radio-group {
   display: flex;
-  gap: var(--space-lg);
+  gap: var(--space-md);
   margin-top: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .radio-label {
@@ -450,6 +548,8 @@ pre {
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
   background: var(--color-surface);
+  min-width: 90px;
+  justify-content: center;
 }
 
 .radio-label:hover {
@@ -465,7 +565,11 @@ pre {
 
 .radio-label:has(input:checked) {
   border-color: var(--color-primary);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.1),
+    rgba(99, 102, 241, 0.05)
+  );
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
@@ -481,7 +585,11 @@ pre {
 }
 
 .withdraw-button {
-  background: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-hover));
+  background: linear-gradient(
+    135deg,
+    var(--color-secondary),
+    var(--color-secondary-hover)
+  );
   color: white;
   border: none;
   padding: var(--space-sm) var(--space-lg);
@@ -555,16 +663,20 @@ pre {
 }
 
 @keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modalSlideIn {
-  from { 
+  from {
     opacity: 0;
     transform: translateY(-50px) scale(0.9);
   }
-  to { 
+  to {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -572,7 +684,11 @@ pre {
 
 /* Balance display styling */
 .balance-display {
-  background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-secondary),
+    var(--color-bg-tertiary)
+  );
   padding: var(--space-sm);
   border-radius: var(--radius-md);
   margin: var(--space-sm) 0;
@@ -586,11 +702,11 @@ pre {
 
 /* Info section for compact text grouping */
 .info-section {
-  margin: var(--space-sm) 0;
+  margin: var(--space-xs) 0;
 }
 
 .info-section p {
-  margin: var(--space-xs) 0;
+  margin: calc(var(--space-xs) / 2) 0;
 }
 
 .options-container {
@@ -599,6 +715,7 @@ pre {
   gap: var(--space-lg);
   width: 100%;
   max-width: 100%;
+  margin-top: 0.5rem;
   margin: 0 auto;
 }
 
@@ -607,7 +724,7 @@ pre {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-md); /* Reduced vertical padding */
   transition: all var(--transition-normal);
   max-width: 100%;
   overflow: hidden; /* Prevent content from spilling out */
@@ -616,4 +733,9 @@ pre {
 .option-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+.option-card h4 {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
 }

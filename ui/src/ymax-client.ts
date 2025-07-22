@@ -3,8 +3,8 @@ import { Fail } from '@endo/errors';
 import { objectMap } from '@endo/patterns';
 type NatAmount = { brand: Brand<'nat'>; value: bigint }; // XXX from ERTP
 
-type YieldProtocol = 'USDN' | 'Aave' | 'Compound';
-type AxelarChain = 'Avalanche' | 'Arbitrum'; // XXX etc.
+export type YieldProtocol = 'USDN' | 'Aave' | 'Compound';
+export type EVMChain = 'Avalanche' | 'Arbitrum'; // XXX etc.
 
 const { entries, values } = Object;
 const { add, make } = AmountMath;
@@ -31,7 +31,7 @@ export const makePortfolioSteps = <
   goal: G,
   opts: {
     /** XXX assume same chain for Aave and Compound */
-    evm?: AxelarChain;
+    evm?: EVMChain;
     feeBrand?: Brand<'nat'>;
     feeBasisPoints?: bigint; // Add custom fee amount parameter
     fees?: Record<keyof G, { Account: NatAmount; Call: NatAmount }>;
@@ -58,10 +58,10 @@ export const makePortfolioSteps = <
   const GmpFee =
     values(fees).length > 0
       ? amountSum(
-        values(fees)
-          .map(f => [f.Account, f.Call])
-          .flat(),
-      )
+          values(fees)
+            .map(f => [f.Account, f.Call])
+            .flat(),
+        )
       : undefined;
   const give = { Deposit, ...(GmpFee ? { GmpFee } : {}) };
   steps.push({ src: '<Deposit>', dest: '@agoric', amount: Deposit });
