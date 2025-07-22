@@ -1,7 +1,15 @@
 import { stringifyAmountValue } from '@agoric/ui-components';
+import { useState } from 'react';
+
+// Define position types
+export type PositionType = 'USDN' | 'Aave';
 
 type TradeProps = {
-  makeOffer: () => void;
+  makeOffer: (
+    usdcAmount: bigint,
+    bldFeeAmount: bigint,
+    positionType: PositionType,
+  ) => void;
   withdrawUSDC: () => void;
   openEmptyPortfolio: () => void;
   istPurse: Purse;
@@ -10,7 +18,7 @@ type TradeProps = {
   usdcPurse?: Purse;
 };
 
-// Simplified Trade component with only a fixed USDC give amount
+// Simplified Trade component with customizable USDC and BLD fee amounts
 const Trade = ({
   makeOffer,
   withdrawUSDC,
@@ -19,9 +27,20 @@ const Trade = ({
   offerId,
   usdcPurse,
 }: TradeProps) => {
+  // Default to 1.25 USDC and 20 BLD
+  const [usdcAmount, setUsdcAmount] = useState<string>('1.25');
+  const [bldFeeAmount, setBldFeeAmount] = useState<string>('20');
+  const [positionType, setPositionType] = useState<PositionType>('Aave');
+
   // Handle making an offer
   const handleMakeOffer = () => {
-    makeOffer();
+    // Convert USDC amount to bigint (USDC has 6 decimal places)
+    const usdcValue = BigInt(Math.floor(parseFloat(usdcAmount) * 1_000_000));
+
+    // Convert BLD fee amount to bigint (BLD has 6 decimal places)
+    const bldValue = BigInt(Math.floor(parseFloat(bldFeeAmount) * 1_000_000));
+
+    makeOffer(usdcValue, bldValue, positionType);
   };
 
   // Handle withdrawing USDC
@@ -36,52 +55,112 @@ const Trade = ({
 
   return (
     <>
-      <div className="trade">
-        <h3>Offer Options</h3>
-        <div className="offer-details">
-          <h4>Option 1: Make Offer with USDC</h4>
-          <p>
-            This offer will send exactly <strong>1.10 USDC</strong> to the
-            contract.
-          </p>
-          {usdcPurse && (
-            <p>
-              Your current USDC balance:{' '}
-              <strong>
-                {stringifyAmountValue(
-                  usdcPurse.currentAmount,
-                  usdcPurse.displayInfo.assetKind,
-                  usdcPurse.displayInfo.decimalPlaces,
-                )}
-              </strong>
-            </p>
-          )}
-          <p>
-            The offer is configured to only include the "give" part without a
-            "want" part.
-          </p>
-          <p>
-            After locking funds, you can withdraw using the withdraw button.
-          </p>
+      <div className="page-header">
+        <h1>ymax-dev-ui</h1>
+      </div>
 
+      <div className="options-container">
+        <div className="option-card">
+          <h4>Option 1: Make Offer with USDC</h4>
+
+          <div className="input-row">
+            <div className="input-group">
+              <label htmlFor="usdc-amount">USDC Amount:</label>
+              <input
+                id="usdc-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={usdcAmount}
+                onChange={e => setUsdcAmount(e.target.value)}
+                placeholder="Enter USDC amount"
+              />
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="bld-fee">BLD Fee Amount:</label>
+              <input
+                id="bld-fee"
+                type="number"
+                step="1"
+                min="1"
+                value={bldFeeAmount}
+                onChange={e => setBldFeeAmount(e.target.value)}
+                placeholder="Enter BLD fee amount"
+              />
+            </div>
+          </div>
+
+          <div className="input-group position-select">
+            <label>Position Type:</label>
+            <div className="radio-group">
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="positionType"
+                  value="USDN"
+                  checked={positionType === 'USDN'}
+                  onChange={() => setPositionType('USDN')}
+                />
+                USDN
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="positionType"
+                  value="Aave"
+                  checked={positionType === 'Aave'}
+                  onChange={() => setPositionType('Aave')}
+                />
+                Aave
+              </label>
+            </div>
+          </div>
+
+          {usdcPurse && (
+            <div className="balance-display">
+              <p>
+                Your current USDC balance:{' '}
+                <strong>
+                  {stringifyAmountValue(
+                    usdcPurse.currentAmount,
+                    usdcPurse.displayInfo.assetKind,
+                    usdcPurse.displayInfo.decimalPlaces,
+                  )}
+                </strong>
+              </p>
+            </div>
+          )}
+          <div className="info-section">
+            <p>
+              The offer is configured to only include the "give" part without a
+              "want" part.
+            </p>
+            <p>
+              After locking funds, you can withdraw using the withdraw button.
+            </p>
+          </div>
+        </div>
+
+        <div className="option-card">
           <h4>Option 2: Open Empty Portfolio</h4>
-          <p>
-            This option will open a new portfolio without requiring any USDC
-            deposit.
-          </p>
-          <p>
-            Use this if you just want to create a portfolio without opening a
-            position.
-          </p>
+          <div className="info-section">
+            <p>
+              This option will open a new portfolio without requiring any USDC
+              deposit.
+            </p>
+            <p>
+              Use this if you just want to create a portfolio without opening a
+              position.
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="offer-actions">
         {walletConnected ? (
           <div className="button-group">
-            <button onClick={handleMakeOffer}>
-              Make Offer (at least 1.0 USDC)
-            </button>
+            <button onClick={handleMakeOffer}>Open Position</button>
 
             <button
               onClick={handleOpenEmptyPortfolio}
@@ -100,104 +179,6 @@ const Trade = ({
           <p>Please connect your wallet to make an offer.</p>
         )}
       </div>
-
-      <style>{`
-        .offer-details {
-          border: 1px solid #ddd;
-          border-radius: 5px;
-          padding: 15px;
-          margin-bottom: 20px;
-        }
-        
-        .offer-details p {
-          margin: 8px 0;
-        }
-        
-        .offer-actions {
-          margin-top: 20px;
-        }
-        
-        .button-group {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        
-        .withdraw-button {
-          background-color: #4a90e2;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.3s;
-        }
-        
-        .withdraw-button:hover {
-          background-color: #3a7bbd;
-        }
-        
-        .empty-portfolio-button {
-          background-color: #5cb85c;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.3s;
-        }
-        
-        .empty-portfolio-button:hover {
-          background-color: #4cae4c;
-        }
-
-        .modal {
-          display: block;
-          position: fixed;
-          z-index: 1;
-          left: 0;
-          top: 0;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(0,0,0,0.4);
-        }
-        
-        .modal-content {
-          margin: 15% auto;
-          padding: 20px;
-          border: 1px solid #888;
-          width: 80%;
-          max-width: 600px;
-          border-radius: 5px;
-        }
-        
-        .close {
-          color: #aaa;
-          float: right;
-          font-size: 28px;
-          font-weight: bold;
-          cursor: pointer;
-        }
-        
-        pre {
-          background-color: #f8f8f8;
-          border: 1px solid #ddd;
-          border-radius: 3px;
-          padding: 10px;
-          overflow: auto;
-          max-height: 400px;
-        }
-
-        @media (prefers-color-scheme: light) {
-          .offer-details {
-            background-color: #f5f5f5;
-          }
-          .modal-content {
-            background-color: #fefefe;
-          }
-        }
-
-      `}</style>
     </>
   );
 };

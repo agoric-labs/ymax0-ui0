@@ -13,7 +13,7 @@ import {
 import { subscribeLatest } from '@agoric/notifier';
 import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
-import { Trade } from './components/Trade';
+import { Trade, PositionType } from './components/Trade';
 import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
 
 const { fromEntries } = Object;
@@ -70,6 +70,7 @@ interface AppState {
   brands?: Record<string, unknown>;
   purses?: Array<Purse>;
   offerId?: number;
+  positionType?: PositionType;
 }
 
 const useAppStore = create<AppState>(() => ({}));
@@ -116,7 +117,11 @@ const connectWallet = async () => {
   }
 };
 
-const makeOffer = () => {
+const makeOffer = (
+  usdcAmount: bigint = 1_250_000n,
+  bldFeeAmount: bigint = 20_000_000n,
+  positionType: PositionType = 'Aave',
+) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
@@ -161,15 +166,43 @@ const makeOffer = () => {
     return;
   }
 
-  // Fixed amount of 1.10 USDC
-  const unit = 1_100_000n; // USDC has 6 decimal places
-  const giveValue = (unit * 1_10n) / 1_00n;
+  // Get BLD brand from purses
+  // XXX: Workaround for mismatching brand board ID in agoricNames.brand
+  // XXX: Remove this once the issue is fixed
+  const getBLDBrand = () => {
+    if (!purses) return null;
 
-  const { give, steps } = makePortfolioSteps(
-    { USDN: { brand: usdcBrand as Brand<'nat'>, value: giveValue } },
-    // XXX should query
-    { detail: { usdnOut: (giveValue * 99n) / 100n } },
-  );
+    // Look for BLD purse in the purses
+    const bldPurse = purses.find(
+      purse => purse.brandPetname?.toLowerCase() === 'bld',
+    );
+
+    return bldPurse?.brand;
+  };
+  const BLDBrand = getBLDBrand();
+  if (!BLDBrand) {
+    alert('Required brand (BLD) is not available in purses.');
+    return;
+  }
+
+  // Use the provided USDC amount or default to 1.25 USDC
+  const giveValue = usdcAmount; // USDC has 6 decimal places
+
+  // Create position object based on selected type
+  const position: Record<string, { brand: Brand<'nat'>; value: bigint }> = {};
+  position[positionType] = {
+    brand: usdcBrand as Brand<'nat'>,
+    value: giveValue,
+  };
+
+  const { give, steps } = makePortfolioSteps(position, {
+    feeBrand: BLDBrand as Brand<'nat'>,
+    feeBasisPoints: bldFeeAmount,
+    detail:
+      positionType === 'USDN'
+        ? { usdnOut: (giveValue * 99n) / 100n }
+        : undefined,
+  });
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
@@ -181,8 +214,8 @@ const makeOffer = () => {
 
   // Generate a unique offerId
   const offerId = Date.now();
-  // Store the offerId for continuing offers
-  useAppStore.setState({ offerId });
+  // Store the offerId and position type for continuing offers
+  useAppStore.setState({ offerId, positionType });
 
   wallet?.makeOffer(
     {
@@ -264,8 +297,10 @@ const withdrawUSDC = () => {
   });
 
   const amount = proposal.want.Cash;
+  const { positionType = 'USDN' } = useAppStore.getState();
+
   const steps: MovementDesc[] = [
-    { src: 'USDN', dest: '@noble', amount },
+    { src: positionType, dest: '@noble', amount },
     { src: '@noble', dest: '@agoric', amount },
     { src: '@agoric', dest: '<Cash>', amount },
   ];
@@ -504,7 +539,9 @@ function App() {
           <div className="card">
             {' '}
             <Trade
-              makeOffer={makeOffer}
+              makeOffer={(usdcAmount, bldFeeAmount, positionType) =>
+                makeOffer(usdcAmount, bldFeeAmount, positionType)
+              }
               withdrawUSDC={withdrawUSDC}
               openEmptyPortfolio={openEmptyPortfolio}
               istPurse={istPurse as Purse}

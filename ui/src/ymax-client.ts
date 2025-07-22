@@ -33,6 +33,7 @@ export const makePortfolioSteps = <
     /** XXX assume same chain for Aave and Compound */
     evm?: AxelarChain;
     feeBrand?: Brand<'nat'>;
+    feeBasisPoints?: bigint; // Add custom fee amount parameter
     fees?: Record<keyof G, { Account: NatAmount; Call: NatAmount }>;
     detail?: { usdnOut: NatValue };
   } = {},
@@ -40,11 +41,12 @@ export const makePortfolioSteps = <
   values(goal).length > 0 || Fail`empty goal`;
   const { USDN: _1, ...evmGoal } = goal;
   const {
-    evm = 'Arbitrum',
+    evm = 'Avalanche',
     feeBrand,
+    feeBasisPoints = 2_000_000n, // Default to 2 BLD (2,000,000 micro-BLD)
     fees = objectMap(evmGoal, _ => ({
-      Account: make(NonNullish(feeBrand), 150n),
-      Call: make(NonNullish(feeBrand), 100n),
+      Account: make(NonNullish(feeBrand), feeBasisPoints),
+      Call: make(NonNullish(feeBrand), feeBasisPoints),
     })),
     detail = 'USDN' in goal
       ? { usdnOut: ((goal.USDN?.value || 0n) * 99n) / 100n }
@@ -56,10 +58,10 @@ export const makePortfolioSteps = <
   const GmpFee =
     values(fees).length > 0
       ? amountSum(
-          values(fees)
-            .map(f => [f.Account, f.Call])
-            .flat(),
-        )
+        values(fees)
+          .map(f => [f.Account, f.Call])
+          .flat(),
+      )
       : undefined;
   const give = { Deposit, ...(GmpFee ? { GmpFee } : {}) };
   steps.push({ src: '<Deposit>', dest: '@agoric', amount: Deposit });
