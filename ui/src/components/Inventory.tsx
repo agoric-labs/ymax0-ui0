@@ -7,7 +7,12 @@ type InventoryProps = {
   usdcPurse?: Purse;
 };
 
-const Inventory = ({ address, istPurse, itemsPurse, usdcPurse }: InventoryProps) => (
+const Inventory = ({
+  address,
+  istPurse,
+  itemsPurse,
+  usdcPurse,
+}: InventoryProps) => (
   <div className="card">
     <h3>My Wallet</h3>
     <div>

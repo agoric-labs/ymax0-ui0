@@ -14,18 +14,16 @@ import { subscribeLatest } from '@agoric/notifier';
 import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
+import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
+import { getBrand } from './utils';
+import type {
+  Environment,
+  EndpointConfig,
+  AppState,
+  YieldProtocol,
+} from './types';
 
 const { fromEntries } = Object;
-
-type Wallet = Awaited<ReturnType<typeof makeAgoricWalletConnection>>;
-
-type Environment = 'devnet' | 'localhost';
-
-interface EndpointConfig {
-  RPC: string;
-  API: string;
-  NETWORK_CONFIG: string;
-}
 
 const ENVIRONMENT_CONFIGS: Record<Environment, EndpointConfig> = {
   devnet: {
@@ -62,14 +60,6 @@ if (codeSpaceHostName && codeSpaceDomain) {
   console.log(`Using ${getInitialEnvironment()} endpoints:`, ENDPOINTS);
 }
 const watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, 'agoricdev-25');
-
-interface AppState {
-  wallet?: Wallet;
-  offerUpInstance?: unknown;
-  brands?: Record<string, unknown>;
-  purses?: Array<Purse>;
-  offerId?: number;
-}
 
 const useAppStore = create<AppState>(() => ({}));
 
@@ -115,37 +105,65 @@ const connectWallet = async () => {
   }
 };
 
-const makeOffer = () => {
-  const { wallet, offerUpInstance, brands } = useAppStore.getState();
+const makeOffer = (
+  usdcAmount: bigint = 1_250_000n,
+  bldFeeAmount: bigint = 20_000_000n,
+  yProtocol: YieldProtocol = 'Aave',
+) => {
+  const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
   }
-  if (!(brands && brands.USDC)) {
-    alert('USDC brand not available');
-    throw Error('USDC brand not available');
-  }
-  if (!(brands && brands.PoC26)) {
-    alert('PoC26 brand not available');
-    throw Error('PoC26 brand not available');
+
+  const usdcBrand = getBrand(purses, 'usdc');
+  if (!usdcBrand) {
+    alert('Required brand (USDC) is not available in purses.');
+    return;
   }
 
-  // Fixed amount of 1.10 USDC
-  const giveValue = 1_100_000n; // Assuming 6 decimal places for USDC
-  const give = {
-    USDN: { brand: brands.USDC, value: giveValue },
-    Access: { brand: brands.PoC26, value: 1n },
+  const poc26Brand = getBrand(purses, 'poc26');
+  if (!poc26Brand) {
+    alert('Required brand (PoC26) is not available in purses.');
+    return;
+  }
+
+  const BLDBrand = getBrand(purses, 'bld');
+  if (!BLDBrand) {
+    alert('Required brand (BLD) is not available in purses.');
+    return;
+  }
+
+  // Use the provided USDC amount or default to 1.25 USDC
+  const giveValue = usdcAmount; // USDC has 6 decimal places
+
+  // Create position object based on selected type
+  const position: Record<string, { brand: Brand<'nat'>; value: bigint }> = {};
+  position[yProtocol] = {
+    brand: usdcBrand as Brand<'nat'>,
+    value: giveValue,
   };
+
+  const { give, steps } = makePortfolioSteps(position, {
+    evm: 'Avalanche',
+    feeBrand: BLDBrand as Brand<'nat'>,
+    feeBasisPoints: bldFeeAmount,
+    detail:
+      yProtocol === 'USDN' ? { usdnOut: (giveValue * 99n) / 100n } : undefined,
+  });
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
-    give,
+    give: {
+      ...give,
+      Access: { brand: poc26Brand, value: 1n },
+    },
   });
 
   // Generate a unique offerId
   const offerId = Date.now();
-  // Store the offerId for continuing offers
-  useAppStore.setState({ offerId });
+  // Store the offerId and position type for continuing offers
+  useAppStore.setState({ offerId, yProtocol });
 
   wallet?.makeOffer(
     {
@@ -153,8 +171,13 @@ const makeOffer = () => {
       instance: offerUpInstance,
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
-    { give },
-    { usdnOut: (giveValue * 99n) / 100n }, // XXX should query
+    {
+      give: {
+        ...give,
+        Access: { brand: poc26Brand, value: 1n },
+      },
+    },
+    { flow: steps },
     (update: { status: string; data?: unknown }) => {
       console.log('Offer update:', update);
 
@@ -180,7 +203,7 @@ const makeOffer = () => {
 };
 
 const withdrawUSDC = () => {
-  const { wallet, offerUpInstance, offerId } = useAppStore.getState();
+  const { wallet, offerUpInstance, offerId, purses } = useAppStore.getState();
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
@@ -191,11 +214,31 @@ const withdrawUSDC = () => {
     return;
   }
 
+  const usdcBrand = getBrand(purses, 'usdc');
+  if (!usdcBrand) {
+    alert('Required brand (USDC) is not available in purses.');
+    return;
+  }
+
+  const proposal = {
+    // TODO: hardcoded for testing
+    want: { Cash: { brand: usdcBrand as Brand<'nat'>, value: 300n } },
+  };
+
   console.log('Making continuing offer with:', {
     previousOffer: offerId,
     instance: offerUpInstance,
+    proposal,
   });
 
+  const amount = proposal.want.Cash;
+  const { yProtocol = 'USDN' } = useAppStore.getState();
+
+  const steps: MovementDesc[] = [
+    { src: yProtocol, dest: '@noble', amount },
+    { src: '@noble', dest: '@agoric', amount },
+    { src: '@agoric', dest: '<Cash>', amount },
+  ];
   wallet?.makeOffer(
     {
       source: 'continuing',
@@ -208,8 +251,8 @@ const withdrawUSDC = () => {
         gas: 400000,
       },
     },
-    {}, // No assets being exchanged in this follow-up offer
-    { amountValue: 300n }, // TODO: hardcoded for testing
+    proposal,
+    { flow: steps },
     (update: { status: string; data?: unknown }) => {
       console.log('Withdraw offer update:', update);
 
@@ -232,15 +275,17 @@ const withdrawUSDC = () => {
 };
 
 const openEmptyPortfolio = () => {
-  const { wallet, offerUpInstance, brands } = useAppStore.getState();
+  const { wallet, offerUpInstance, purses } = useAppStore.getState();
 
   if (!offerUpInstance) {
     alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
     throw Error('no contract instance');
   }
-  if (!(brands && brands.PoC26)) {
-    alert('PoC26 brand not available');
-    throw Error('PoC26 brand not available');
+
+  const poc26Brand = getBrand(purses, 'poc26');
+  if (!poc26Brand) {
+    alert('Required brand (PoC26) is not available in purses.');
+    return;
   }
 
   // Generate a unique offerId
@@ -258,7 +303,7 @@ const openEmptyPortfolio = () => {
       instance: offerUpInstance,
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
-    { give: { Access: { brand: brands.PoC26, value: 1n } } }, // no USDN
+    { give: { Access: { brand: poc26Brand, value: 1n } } }, // no USDN
     {}, // No terms needed
     (update: { status: string; data?: unknown }) => {
       console.log('Empty portfolio offer update:', update);
@@ -416,7 +461,9 @@ function App() {
           <div className="card">
             {' '}
             <Trade
-              makeOffer={makeOffer}
+              makeOffer={(usdcAmount, bldFeeAmount, yProtocol) =>
+                makeOffer(usdcAmount, bldFeeAmount, yProtocol)
+              }
               withdrawUSDC={withdrawUSDC}
               openEmptyPortfolio={openEmptyPortfolio}
               istPurse={istPurse as Purse}
