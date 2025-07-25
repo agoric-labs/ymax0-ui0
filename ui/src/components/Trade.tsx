@@ -15,6 +15,8 @@ type TradeProps = {
   walletConnected: boolean;
   offerId?: number;
   usdcPurse?: Purse;
+  bldPurse?: Purse;
+  poc26Purse?: Purse;
 };
 
 // Simplified Trade component with customizable USDC and BLD fee amounts
@@ -25,6 +27,8 @@ const Trade = ({
   walletConnected,
   offerId,
   usdcPurse,
+  bldPurse,
+  poc26Purse,
 }: TradeProps) => {
   // Default to 1.25 USDC and 20 BLD
   const [usdcAmount, setUsdcAmount] = useState<string>('1.25');
@@ -159,20 +163,50 @@ const Trade = ({
             </div>
           )}
 
-          {usdcPurse && (
-            <div className="balance-display">
-              <p>
-                Your current USDC balance:{' '}
-                <strong>
-                  {stringifyAmountValue(
-                    usdcPurse.currentAmount,
-                    usdcPurse.displayInfo.assetKind,
-                    usdcPurse.displayInfo.decimalPlaces,
-                  )}
-                </strong>
-              </p>
+          <div className="balance-display">
+            <h5 style={{ marginBottom: '10px', color: '#333' }}>Current Balances:</h5>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+              <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>USDC</div>
+                <div style={{ fontWeight: 'bold', color: '#0066cc' }}>
+                  {usdcPurse 
+                    ? stringifyAmountValue(
+                        usdcPurse.currentAmount,
+                        usdcPurse.displayInfo.assetKind,
+                        usdcPurse.displayInfo.decimalPlaces,
+                      )
+                    : 'Loading...'
+                  }
+                </div>
+              </div>
+              <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>BLD</div>
+                <div style={{ fontWeight: 'bold', color: '#dc3545' }}>
+                  {bldPurse 
+                    ? stringifyAmountValue(
+                        bldPurse.currentAmount,
+                        bldPurse.displayInfo.assetKind,
+                        bldPurse.displayInfo.decimalPlaces,
+                      )
+                    : 'Loading...'
+                  }
+                </div>
+              </div>
+              <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>PoC26</div>
+                <div style={{ fontWeight: 'bold', color: '#28a745' }}>
+                  {poc26Purse 
+                    ? stringifyAmountValue(
+                        poc26Purse.currentAmount,
+                        poc26Purse.displayInfo.assetKind,
+                        poc26Purse.displayInfo.decimalPlaces,
+                      )
+                    : 'Loading...'
+                  }
+                </div>
+              </div>
             </div>
-          )}
+          </div>
           <div className="info-section">
             <p>
               The offer is configured to only include the "give" part without a
