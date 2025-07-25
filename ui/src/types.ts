@@ -7,12 +7,13 @@ export interface Brand {
 }
 
 // Environment and configuration types
-export type Environment = 'devnet' | 'localhost';
+export type Environment = 'mainnet' | 'devnet' | 'localhost';
 
 export interface EndpointConfig {
   RPC: string;
   API: string;
   NETWORK_CONFIG: string;
+  CHAIN_ID: string;
 }
 
 // Wallet connection type

@@ -18,48 +18,15 @@ import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
 import { getBrand } from './utils';
 import type {
   Environment,
-  EndpointConfig,
   AppState,
   YieldProtocol,
 } from './types';
+import { getInitialEnvironment, configureEndpoints } from './config';
 
 const { fromEntries } = Object;
 
-const ENVIRONMENT_CONFIGS: Record<Environment, EndpointConfig> = {
-  devnet: {
-    RPC: 'https://devnet.rpc.agoric.net',
-    API: 'https://devnet.api.agoric.net',
-    NETWORK_CONFIG: 'https://devnet.agoric.net/network-config',
-  },
-  localhost: {
-    RPC: 'http://localhost:26657',
-    API: 'http://localhost:1317',
-    NETWORK_CONFIG: 'https://local.agoric.net/network-config',
-  },
-};
-
-const getInitialEnvironment = (): Environment => {
-  const savedEnvironment = localStorage.getItem('agoricEnvironment');
-  return (savedEnvironment as Environment) || 'devnet';
-};
-
-const ENDPOINTS = { ...ENVIRONMENT_CONFIGS[getInitialEnvironment()] };
-// Network config will be used from the environment configs
-
-const codeSpaceHostName = import.meta.env.VITE_HOSTNAME;
-
-const codeSpaceDomain = import.meta.env
-  .VITE_GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
-
-// Only override with codespace endpoints if explicitly configured
-if (codeSpaceHostName && codeSpaceDomain) {
-  ENDPOINTS.API = `https://${codeSpaceHostName}-1317.${codeSpaceDomain}`;
-  ENDPOINTS.RPC = `https://${codeSpaceHostName}-26657.${codeSpaceDomain}`;
-  console.log('Using codespace endpoints:', ENDPOINTS);
-} else {
-  console.log(`Using ${getInitialEnvironment()} endpoints:`, ENDPOINTS);
-}
-const watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, 'agoricdev-25');
+let ENDPOINTS = configureEndpoints(getInitialEnvironment());
+let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
 const useAppStore = create<AppState>(() => ({}));
 
@@ -86,16 +53,15 @@ const setup = async () => {
 };
 
 const connectWallet = async () => {
+  const currentEnvironment = getInitialEnvironment();
   try {
     await fetch(ENDPOINTS.RPC);
   } catch (error) {
     throw new Error(
-      `Cannot connect to Agoric ${getInitialEnvironment()}. Please check your connection!`,
+      `Cannot connect to Agoric ${currentEnvironment}. Please check your connection!`,
     );
   }
-  await suggestChain(
-    ENVIRONMENT_CONFIGS[getInitialEnvironment()].NETWORK_CONFIG,
-  );
+  await suggestChain(ENDPOINTS.NETWORK_CONFIG);
   const wallet = await makeAgoricWalletConnection(watcher, ENDPOINTS.RPC);
   useAppStore.setState({ wallet });
   const { pursesNotifier } = wallet;
@@ -402,6 +368,8 @@ function App() {
   const istPurse = purses?.find(p => p.brandPetname === 'IST');
   const itemsPurse = purses?.find(p => p.brandPetname === 'Items');
   const usdcPurse = purses?.find(p => p.brandPetname === 'USDC');
+  const bldPurse = purses?.find(p => p.brandPetname === 'BLD');
+  const poc26Purse = purses?.find(p => p.brandPetname === 'PoC26');
 
   const handleEnvironmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newEnvironment = e.target.value as Environment;
@@ -409,7 +377,8 @@ function App() {
     localStorage.setItem('agoricEnvironment', newEnvironment);
 
     // Update endpoints with new environment configuration
-    Object.assign(ENDPOINTS, ENVIRONMENT_CONFIGS[newEnvironment]);
+    ENDPOINTS = configureEndpoints(newEnvironment);
+    watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
     // If wallet was connected, disconnect it (refresh required)
     if (wallet) {
@@ -443,6 +412,7 @@ function App() {
             value={environment}
             onChange={handleEnvironmentChange}
           >
+            <option value="mainnet">Mainnet</option>
             <option value="devnet">Devnet</option>
             <option value="localhost">Localhost</option>
           </select>
@@ -470,6 +440,8 @@ function App() {
               walletConnected={!!wallet}
               offerId={offerId}
               usdcPurse={usdcPurse as Purse}
+              bldPurse={bldPurse as Purse}
+              poc26Purse={poc26Purse as Purse}
             />
             <hr />
             {wallet && istPurse ? (
@@ -478,6 +450,8 @@ function App() {
                 istPurse={istPurse}
                 itemsPurse={itemsPurse as Purse}
                 usdcPurse={usdcPurse as Purse}
+                bldPurse={bldPurse as Purse}
+                poc26Purse={poc26Purse as Purse}
               />
             ) : (
               <button onClick={tryConnectWallet}>Connect Wallet</button>

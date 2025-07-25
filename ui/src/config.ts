@@ -1,15 +1,23 @@
 import type { Environment, EndpointConfig } from './types';
 
 export const ENVIRONMENT_CONFIGS: Record<Environment, EndpointConfig> = {
+  mainnet: {
+    RPC: 'https://main.rpc.agoric.net',
+    API: 'https://main.api.agoric.net',
+    NETWORK_CONFIG: 'https://main.agoric.net/network-config',
+    CHAIN_ID: 'agoric-3',
+  },
   devnet: {
     RPC: 'https://devnet.rpc.agoric.net',
     API: 'https://devnet.api.agoric.net',
     NETWORK_CONFIG: 'https://devnet.agoric.net/network-config',
+    CHAIN_ID: 'agoricdev-25',
   },
   localhost: {
     RPC: 'http://localhost:26657',
     API: 'http://localhost:1317',
     NETWORK_CONFIG: 'https://local.agoric.net/network-config',
+    CHAIN_ID: 'agoriclocal',
   },
 };
 
