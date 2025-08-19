@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { Routes, Route } from 'react-router-dom';
 
 import './App.css';
 import {
@@ -14,6 +15,7 @@ import { subscribeLatest } from '@agoric/notifier';
 import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
+import Admin from './components/Admin.tsx';
 import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
 import { getBrand } from './utils';
 import type {
@@ -25,7 +27,7 @@ import { getInitialEnvironment, configureEndpoints } from './config';
 
 const { fromEntries } = Object;
 
-let ENDPOINTS = configureEndpoints(getInitialEnvironment());
+let ENDPOINTS = configureEndpoints(getInitialEnvironment(), true);
 let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
 const useAppStore = create<AppState>(() => ({}));
@@ -36,6 +38,7 @@ const setup = async () => {
     instances => {
       console.log('got instances', instances);
       useAppStore.setState({
+        instances,
         offerUpInstance: instances.find(([name]) => name === 'ymax0')!.at(1),
       });
     },
@@ -69,6 +72,18 @@ const connectWallet = async () => {
     console.log('got purses', purses);
     useAppStore.setState({ purses });
   }
+};
+
+const tryConnectWallet = () => {
+  connectWallet().catch(err => {
+    switch (err.message) {
+      case 'KEPLR_CONNECTION_ERROR_NO_SMART_WALLET':
+        alert('no smart wallet at that address');
+        break;
+      default:
+        alert(err.message);
+    }
+  });
 };
 
 const makeOffer = (
@@ -295,7 +310,52 @@ const openEmptyPortfolio = () => {
   );
 };
 
-function App() {
+const signAndBroadcastAction = (publicInvitationMaker: string) => {
+  const { wallet, offerUpInstance } = useAppStore.getState();
+  if (!offerUpInstance) {
+    alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
+    throw Error('no contract instance');
+  }
+
+  if (!wallet) {
+    alert('Wallet not connected. Please connect wallet on main page.');
+    return;
+  }
+
+  console.log(
+    `Broadcasting action ${publicInvitationMaker} with instance:`,
+    offerUpInstance,
+  );
+
+  wallet.makeOffer(
+    {
+      source: 'contract',
+      instance: offerUpInstance,
+      publicInvitationMaker,
+    },
+    {}, // No proposal
+    undefined, // No offerArgs
+    (update: { status: string; data?: unknown }) => {
+      console.log(`${publicInvitationMaker} offer update:`, update);
+      const offerDetails = JSON.stringify(update, null, 2);
+
+      if (update.status === 'error') {
+        console.error(`${publicInvitationMaker} error:`, update.data);
+        alert(`${publicInvitationMaker} error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log(`${publicInvitationMaker} accepted:`, update.data);
+        alert(`${publicInvitationMaker} accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log(`${publicInvitationMaker} rejected:`, update.data);
+        alert(`${publicInvitationMaker} rejected: ${offerDetails}`);
+      }
+    },
+  );
+};
+
+const MainPage = () => {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
@@ -303,8 +363,6 @@ function App() {
   const chatIframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    setup();
-
     // Prevent iframe scrolling from affecting parent page
     const handleIframeLoad = () => {
       if (chatIframeRef.current) {
@@ -377,7 +435,7 @@ function App() {
     localStorage.setItem('agoricEnvironment', newEnvironment);
 
     // Update endpoints with new environment configuration
-    ENDPOINTS = configureEndpoints(newEnvironment);
+    ENDPOINTS = configureEndpoints(newEnvironment, true);
     watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
     // If wallet was connected, disconnect it (refresh required)
@@ -386,18 +444,6 @@ function App() {
         'Environment changed. Please refresh the page to reconnect the wallet with the new environment.',
       );
     }
-  };
-
-  const tryConnectWallet = () => {
-    connectWallet().catch(err => {
-      switch (err.message) {
-        case 'KEPLR_CONNECTION_ERROR_NO_SMART_WALLET':
-          alert('no smart wallet at that address');
-          break;
-        default:
-          alert(err.message);
-      }
-    });
   };
 
   return (
@@ -473,6 +519,38 @@ function App() {
         </div>
       </div>
     </>
+  );
+};
+
+function App() {
+  useEffect(() => {
+    setup();
+  }, []);
+
+  const { wallet, instances, purses } = useAppStore(({ wallet, instances, purses }) => ({
+    wallet,
+    instances,
+    purses,
+  }));
+
+  return (
+    <Routes>
+      <Route path="/" element={<MainPage />} />
+      <Route
+        path="/admin"
+        element={
+          <Admin
+            signAndBroadcastAction={signAndBroadcastAction}
+            wallet={wallet}
+            tryConnectWallet={tryConnectWallet}
+            instances={instances}
+            purses={purses}
+            keplr={(window as any).keplr}
+            chainId={ENDPOINTS.CHAIN_ID}
+          />
+        }
+      />
+    </Routes>
   );
 }
 

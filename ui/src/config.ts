@@ -29,7 +29,7 @@ export const getInitialEnvironment = (): Environment => {
 /**
  * Configure endpoints based on environment and codespace settings
  */
-export const configureEndpoints = (environment: Environment) => {
+export const configureEndpoints = (environment: Environment, shouldLog = false) => {
   const endpoints = { ...ENVIRONMENT_CONFIGS[environment] };
 
   const codeSpaceHostName = import.meta.env.VITE_HOSTNAME;
@@ -40,9 +40,13 @@ export const configureEndpoints = (environment: Environment) => {
   if (codeSpaceHostName && codeSpaceDomain) {
     endpoints.API = `https://${codeSpaceHostName}-1317.${codeSpaceDomain}`;
     endpoints.RPC = `https://${codeSpaceHostName}-26657.${codeSpaceDomain}`;
-    console.log('Using codespace endpoints:', endpoints);
+    if (shouldLog) {
+      console.log('Using codespace endpoints:', endpoints);
+    }
   } else {
-    console.log(`Using ${environment} endpoints:`, endpoints);
+    if (shouldLog) {
+      console.log(`Using ${environment} endpoints:`, endpoints);
+    }
   }
 
   return endpoints;
