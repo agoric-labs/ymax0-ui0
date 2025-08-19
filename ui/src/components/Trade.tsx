@@ -11,6 +11,13 @@ type TradeProps = {
   ) => void;
   withdrawUSDC: () => void;
   openEmptyPortfolio: () => void;
+  acceptInvitation: () => void;
+  settleTransaction: (
+    amount: bigint,
+    remoteAddress: string,
+    status: string,
+    remoteAxelarChain: string,
+  ) => void;
   istPurse: Purse;
   walletConnected: boolean;
   offerId?: number;
@@ -24,6 +31,8 @@ const Trade = ({
   makeOffer,
   withdrawUSDC,
   openEmptyPortfolio,
+  acceptInvitation,
+  settleTransaction,
   walletConnected,
   offerId,
   usdcPurse,
@@ -35,6 +44,12 @@ const Trade = ({
   const [bldFeeAmount, setBldFeeAmount] = useState<string>('20');
   const [yieldProtocol, setYieldProtocol] = useState<YieldProtocol>('Aave');
   const [evmChain, setEvmChain] = useState<EVMChain>('Avalanche');
+
+  // Settle transaction form state
+  const [settleTxAmount, setSettleTxAmount] = useState<string>('10000');
+  const [remoteAddress, setRemoteAddress] = useState<string>('0x126cf3AC9ea12794Ff50f56727C7C66E26D9C092');
+  const [txStatus, setTxStatus] = useState<string>('confirmed');
+  const [remoteAxelarChain, setRemoteAxelarChain] = useState<string>('eip155:42161');
 
   // Handle making an offer
   const handleMakeOffer = () => {
@@ -65,6 +80,17 @@ const Trade = ({
   // Handle opening an empty portfolio
   const handleOpenEmptyPortfolio = () => {
     openEmptyPortfolio();
+  };
+
+  // Handle accepting invitation
+  const handleAcceptInvitation = () => {
+    acceptInvitation();
+  };
+
+  // Handle settle transaction
+  const handleSettleTransaction = () => {
+    const amount = BigInt(settleTxAmount);
+    settleTransaction(amount, remoteAddress, txStatus, remoteAxelarChain);
   };
 
   return (
@@ -231,6 +257,69 @@ const Trade = ({
             </p>
           </div>
         </div>
+
+        <div className="option-card">
+          <h4>Option 3: Settle Transaction</h4>
+          
+          <div className="input-row">
+            <div className="input-group">
+              <label htmlFor="settle-amount">Amount:</label>
+              <input
+                id="settle-amount"
+                type="number"
+                step="1"
+                min="1"
+                value={settleTxAmount}
+                onChange={e => setSettleTxAmount(e.target.value)}
+                placeholder="Enter amount"
+              />
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="remote-address">Remote Address:</label>
+              <input
+                id="remote-address"
+                type="text"
+                value={remoteAddress}
+                onChange={e => setRemoteAddress(e.target.value)}
+                placeholder="Enter remote address"
+              />
+            </div>
+          </div>
+
+          <div className="input-row">
+            <div className="input-group">
+              <label htmlFor="tx-status">Transaction Status:</label>
+              <select
+                id="tx-status"
+                value={txStatus}
+                onChange={e => setTxStatus(e.target.value)}
+                className="chain-selector"
+              >
+                <option value="confirmed">Confirmed</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="axelar-chain">Remote Axelar Chain:</label>
+              <input
+                id="axelar-chain"
+                type="text"
+                value={remoteAxelarChain}
+                onChange={e => setRemoteAxelarChain(e.target.value)}
+                placeholder="Enter Axelar chain ID"
+              />
+            </div>
+          </div>
+
+          <div className="info-section">
+            <p>
+              This option will settle a CCTP transaction using the provided details.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="offer-actions">
@@ -243,6 +332,20 @@ const Trade = ({
               className="empty-portfolio-button"
             >
               Open Empty Portfolio
+            </button>
+
+            <button
+              onClick={handleAcceptInvitation}
+              className="accept-invitation-button"
+            >
+              Accept invitation
+            </button>
+
+            <button
+              onClick={handleSettleTransaction}
+              className="settle-transaction-button"
+            >
+              Settle transaction
             </button>
 
             {offerId && (

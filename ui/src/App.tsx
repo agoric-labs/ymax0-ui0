@@ -295,6 +295,127 @@ const openEmptyPortfolio = () => {
   );
 };
 
+const acceptInvitation = () => {
+  const { wallet, purses } = useAppStore.getState();
+  
+  if (!wallet) {
+    alert('Wallet not connected');
+    return;
+  }
+
+  if (!purses || purses.length === 0) {
+    alert('No purses available');
+    return;
+  }
+
+  const invitationPurse = purses.find(purse => purse.brandPetname === 'Invitation');
+  
+  const firstPurseBalance = (invitationPurse?.currentAmount.value[0]);
+  // Get the first purse instance as specified in the template
+
+
+  const offer = {
+    id: Date.now(),
+    invitationSpec: {
+      source: 'purse',
+      instance: firstPurseBalance.instance,
+      description: 'resolver',
+    },
+    proposal: { give: {}, want: {} },
+  };
+
+  console.log('Accepting invitation with offer:', offer);
+
+  wallet.makeOffer(
+    offer.invitationSpec,
+    offer.proposal,
+    {},
+    (update: { status: string; data?: unknown }) => {
+      console.log('Accept invitation offer update:', update);
+
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
+      const offerDetails = JSON.stringify(update, bigintReplacer, 2);
+
+      if (update.status === 'error') {
+        console.error('Accept invitation offer error:', update.data);
+        alert(`Accept invitation offer error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log('Accept invitation offer accepted:', update.data);
+        alert(`Accept invitation offer accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log('Accept invitation offer refunded:', update.data);
+        alert(`Accept invitation offer refunded: ${offerDetails}`);
+      }
+    },
+    offer.id,
+  );
+};
+
+const settleTransaction = (
+  amount: bigint,
+  remoteAddress: string,
+  status: string,
+  remoteAxelarChain: string,
+) => {
+  const { wallet } = useAppStore.getState();
+
+  if (!wallet) {
+    alert('Wallet not connected');
+    return;
+  }
+  const prevOfferId = '1755598648000';
+
+  const offer = {
+    id: Date.now(),
+    invitationSpec: {
+      source: 'continuing',
+      previousOffer: prevOfferId,
+      invitationMakerName: 'makeSettleCCTPTransactionInvitation',
+    },
+    proposal: { give: {}, want: {} },
+    offerArgs: {
+      txDetails: {
+        amount,
+        remoteAddress,
+        status,
+      },
+      remoteAxelarChain,
+    },
+  };
+
+  console.log('Settling transaction with offer:', offer);
+
+  wallet.makeOffer(
+    offer.invitationSpec,
+    offer.proposal,
+    offer.offerArgs,
+    (update: { status: string; data?: unknown }) => {
+      console.log('Settle transaction offer update:', update);
+
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
+      const offerDetails = JSON.stringify(update, bigintReplacer, 2);
+
+      if (update.status === 'error') {
+        console.error('Settle transaction offer error:', update.data);
+        alert(`Settle transaction offer error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log('Settle transaction offer accepted:', update.data);
+        alert(`Settle transaction offer accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log('Settle transaction offer refunded:', update.data);
+        alert(`Settle transaction offer refunded: ${offerDetails}`);
+      }
+    },
+    offer.id,
+  );
+};
+
 function App() {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
@@ -436,6 +557,8 @@ function App() {
               }
               withdrawUSDC={withdrawUSDC}
               openEmptyPortfolio={openEmptyPortfolio}
+              acceptInvitation={acceptInvitation}
+              settleTransaction={settleTransaction}
               istPurse={istPurse as Purse}
               walletConnected={!!wallet}
               offerId={offerId}
