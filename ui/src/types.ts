@@ -27,6 +27,7 @@ export interface AppState {
   offerUpInstance?: unknown;
   brands?: Record<string, unknown>;
   purses?: Array<Purse>; // Use the global Purse type
+  instances?: Array<[string, unknown]>;
   offerId?: number;
   yProtocol?: YieldProtocol;
 }
