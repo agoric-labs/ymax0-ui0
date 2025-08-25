@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 import './App.css';
@@ -18,11 +18,7 @@ import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
 import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
 import { getBrand } from './utils';
-import type {
-  Environment,
-  AppState,
-  YieldProtocol,
-} from './types';
+import type { Environment, AppState, YieldProtocol, EVMChain } from './types';
 import { getInitialEnvironment, configureEndpoints } from './config';
 
 const { fromEntries } = Object;
@@ -90,6 +86,7 @@ const makeOffer = (
   usdcAmount: bigint = 1_250_000n,
   bldFeeAmount: bigint = 20_000_000n,
   yProtocol: YieldProtocol = 'Aave',
+  evmChain?: EVMChain,
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -126,7 +123,7 @@ const makeOffer = (
   };
 
   const { give, steps } = makePortfolioSteps(position, {
-    evm: 'Avalanche',
+    evm: evmChain || 'Avalanche',
     feeBrand: BLDBrand as Brand<'nat'>,
     feeBasisPoints: bldFeeAmount,
     detail:
@@ -162,7 +159,7 @@ const makeOffer = (
     (update: { status: string; data?: unknown }) => {
       console.log('Offer update:', update);
 
-      const bigintReplacer = (_k: string, v: any) =>
+      const bigintReplacer = (_k: string, v: unknown) =>
         typeof v === 'bigint' ? `${v}` : v;
       const offerDetails = JSON.stringify(update, bigintReplacer, 2);
 
@@ -289,7 +286,7 @@ const openEmptyPortfolio = () => {
     (update: { status: string; data?: unknown }) => {
       console.log('Empty portfolio offer update:', update);
 
-      const bigintReplacer = (_k: string, v: any) =>
+      const bigintReplacer = (_k: string, v: unknown) =>
         typeof v === 'bigint' ? `${v}` : v;
       const offerDetails = JSON.stringify(update, bigintReplacer, 2);
 
@@ -359,8 +356,67 @@ const MainPage = () => {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
+  const [chatWidth, setChatWidth] = useState(220);
+  const [isResizing, setIsResizing] = useState(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
   // Ref for chat iframe
   const chatIframeRef = useRef<HTMLIFrameElement>(null);
+  const resizeRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      startX.current = e.clientX;
+      startWidth.current = chatWidth;
+      setIsResizing(true);
+    },
+    [chatWidth],
+  );
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      e.preventDefault();
+
+      // Calculate the difference from start position
+      const deltaX = startX.current - e.clientX;
+      const newWidth = startWidth.current + deltaX;
+
+      const minWidth = 200;
+      const maxWidth = 600;
+
+      // Ensure we stay within bounds
+      const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+      setChatWidth(constrainedWidth);
+    },
+    [isResizing],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
     // Prevent iframe scrolling from affecting parent page
@@ -405,8 +461,9 @@ const MainPage = () => {
 
     return () => {
       // Clean up event listeners
-      if (chatIframeRef.current) {
-        chatIframeRef.current.removeEventListener('load', handleIframeLoad);
+      const currentIframe = chatIframeRef.current;
+      if (currentIframe) {
+        currentIframe.removeEventListener('load', handleIframeLoad);
       }
 
       if (chatSidebar) {
@@ -477,8 +534,8 @@ const MainPage = () => {
           <div className="card">
             {' '}
             <Trade
-              makeOffer={(usdcAmount, bldFeeAmount, yProtocol) =>
-                makeOffer(usdcAmount, bldFeeAmount, yProtocol)
+              makeOffer={(usdcAmount, bldFeeAmount, yProtocol, evmChain) =>
+                makeOffer(usdcAmount, bldFeeAmount, yProtocol, evmChain)
               }
               withdrawUSDC={withdrawUSDC}
               openEmptyPortfolio={openEmptyPortfolio}
@@ -505,7 +562,14 @@ const MainPage = () => {
           </div>
         </div>
 
-        <div className="chat-sidebar">
+        <div
+          className="resize-handle"
+          ref={resizeRef}
+          onMouseDown={handleMouseDown}
+          style={{ cursor: 'ew-resize' }}
+        ></div>
+
+        <div className="chat-sidebar" style={{ width: `${chatWidth}px` }}>
           <h3>Agoric Community Chat</h3>
           <div className="iframe-container">
             <iframe
@@ -527,11 +591,13 @@ function App() {
     setup();
   }, []);
 
-  const { wallet, instances, purses } = useAppStore(({ wallet, instances, purses }) => ({
-    wallet,
-    instances,
-    purses,
-  }));
+  const { wallet, instances, purses } = useAppStore(
+    ({ wallet, instances, purses }) => ({
+      wallet,
+      instances,
+      purses,
+    }),
+  );
 
   return (
     <Routes>
