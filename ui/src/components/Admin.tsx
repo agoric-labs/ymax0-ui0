@@ -41,6 +41,7 @@ const Admin: React.FC<AdminProps> = ({
   const [installBundleId, setInstallBundleId] = useState<string>('');
   const [creatorFacetName, setCreatorFacetName] = useState<string>('creatorFacet');
   const [plannerAddress, setPlannerAddress] = useState<string>('');
+  const [resolverAddress, setResolverAddress] = useState<string>('');
   const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
   const [ENDPOINTS, setENDPOINTS] = useState(configureEndpoints(getInitialEnvironment()));
   const watcherRef = useRef<ReturnType<typeof makeAgoricChainStorageWatcher> | null>(null);
@@ -261,6 +262,40 @@ const Admin: React.FC<AdminProps> = ({
     } catch (error) {
       console.error('Deliver planner invitation failed:', error);
       alert(`Deliver planner invitation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeliverResolverInvitation = async () => {
+    if (!wallet || !keplr || !chainId || !watcherRef.current) {
+      alert('Wallet, Keplr, chain ID, or watcher not available');
+      return;
+    }
+
+    if (!resolverAddress.trim()) {
+      alert('Please enter a resolver address');
+      return;
+    }
+
+    try {
+      const postalServiceInstance = instanceInfo?.postalService ? instances?.find(([n]) => n === 'postalService')?.[1] : null;
+      
+      const { target, tools } = reifyWalletEntry<{ deliverResolverInvitation: (resolver: string, postalService: any) => Promise<any> }>({
+        targetName: 'creatorFacet',
+        wallet,
+        keplr,
+        chainId,
+        marshaller: watcherRef.current.marshaller,
+        rpcEndpoint: ENDPOINTS.RPC,
+      });
+
+      const invocationId = trackInvocation(tools, 'deliverResolverInvitation', 'creatorFacet');
+
+      await target.deliverResolverInvitation(resolverAddress, postalServiceInstance);
+      alert('Resolver invitation delivered successfully');
+      setResolverAddress(''); // Clear the form
+    } catch (error) {
+      console.error('Deliver resolver invitation failed:', error);
+      alert(`Deliver resolver invitation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -619,8 +654,11 @@ const Admin: React.FC<AdminProps> = ({
         <CreatorFacetCard
           plannerAddress={plannerAddress}
           setPlannerAddress={setPlannerAddress}
+          resolverAddress={resolverAddress}
+          setResolverAddress={setResolverAddress}
           savedEntries={savedEntries}
           onDeliverPlannerInvitation={handleDeliverPlannerInvitation}
+          onDeliverResolverInvitation={handleDeliverResolverInvitation}
         />
 
         {pendingInvocations.size > 0 && (
