@@ -16,11 +16,7 @@ import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
 import { getBrand } from './utils';
-import type {
-  Environment,
-  AppState,
-  YieldProtocol,
-} from './types';
+import type { Environment, AppState, YieldProtocol } from './types';
 import { getInitialEnvironment, configureEndpoints } from './config';
 
 const { fromEntries } = Object;
@@ -297,7 +293,7 @@ const openEmptyPortfolio = () => {
 
 const acceptInvitation = () => {
   const { wallet, purses } = useAppStore.getState();
-  
+
   if (!wallet) {
     alert('Wallet not connected');
     return;
@@ -308,11 +304,12 @@ const acceptInvitation = () => {
     return;
   }
 
-  const invitationPurse = purses.find(purse => purse.brandPetname === 'Invitation');
-  
-  const firstPurseBalance = (invitationPurse?.currentAmount.value[0]);
-  // Get the first purse instance as specified in the template
+  const invitationPurse = purses.find(
+    purse => purse.brandPetname === 'Invitation',
+  );
 
+  const firstPurseBalance = invitationPurse?.currentAmount.value[0];
+  // Get the first purse instance as specified in the template
 
   const offer = {
     id: Date.now(),
@@ -355,10 +352,9 @@ const acceptInvitation = () => {
 };
 
 const settleTransaction = (
-  amount: bigint,
-  remoteAddress: string,
+  txId: string,
   status: string,
-  remoteAxelarChain: string,
+  prevOfferId: string,
 ) => {
   const { wallet } = useAppStore.getState();
 
@@ -366,23 +362,18 @@ const settleTransaction = (
     alert('Wallet not connected');
     return;
   }
-  const prevOfferId = '1755598648000';
 
   const offer = {
     id: Date.now(),
     invitationSpec: {
       source: 'continuing',
       previousOffer: prevOfferId,
-      invitationMakerName: 'makeSettleCCTPTransactionInvitation',
+      invitationMakerName: 'SettleTransaction',
     },
     proposal: { give: {}, want: {} },
     offerArgs: {
-      txDetails: {
-        amount,
-        remoteAddress,
-        status,
-      },
-      remoteAxelarChain,
+      txId,
+      status,
     },
   };
 

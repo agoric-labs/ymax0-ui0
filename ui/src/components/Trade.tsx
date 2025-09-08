@@ -13,10 +13,9 @@ type TradeProps = {
   openEmptyPortfolio: () => void;
   acceptInvitation: () => void;
   settleTransaction: (
-    amount: bigint,
-    remoteAddress: string,
+    txId: string,
     status: string,
-    remoteAxelarChain: string,
+    prevOfferId: string,
   ) => void;
   istPurse: Purse;
   walletConnected: boolean;
@@ -46,22 +45,25 @@ const Trade = ({
   const [evmChain, setEvmChain] = useState<EVMChain>('Avalanche');
 
   // Settle transaction form state
-  const [settleTxAmount, setSettleTxAmount] = useState<string>('10000');
-  const [remoteAddress, setRemoteAddress] = useState<string>('0x126cf3AC9ea12794Ff50f56727C7C66E26D9C092');
-  const [txStatus, setTxStatus] = useState<string>('confirmed');
-  const [remoteAxelarChain, setRemoteAxelarChain] = useState<string>('eip155:42161');
+  const [txId, setTxId] = useState<string>('');
+  const [txStatus, setTxStatus] = useState<string>('success');
+  const [prevOfferId, setPrevOfferId] = useState<string>(
+    'redeem-2025-09-08T12:18:15.933Z ',
+  );
 
   // Handle making an offer
   const handleMakeOffer = () => {
     // Convert USDC amount to bigint (USDC has 6 decimal places)
-    const usdcValue = BigInt(Math.floor(parseFloat(usdcAmount) * 1_000_000));
+    const usdcValue = BigInt(
+      Math.floor(parseFloat(usdcAmount.trim()) * 1_000_000),
+    );
 
     // Convert BLD fee amount to bigint (BLD has 6 decimal places)
     // For USDN protocol, no fee is required, so pass 0
     const bldValue =
       yieldProtocol === 'USDN'
         ? 0n
-        : BigInt(Math.floor(parseFloat(bldFeeAmount) * 1_000_000));
+        : BigInt(Math.floor(parseFloat(bldFeeAmount.trim()) * 1_000_000));
 
     // Only pass the EVM chain if Aave or Compound is selected
     const evmChainParam =
@@ -89,8 +91,7 @@ const Trade = ({
 
   // Handle settle transaction
   const handleSettleTransaction = () => {
-    const amount = BigInt(settleTxAmount);
-    settleTransaction(amount, remoteAddress, txStatus, remoteAxelarChain);
+    settleTransaction(txId.trim(), txStatus, prevOfferId.trim());
   };
 
   return (
@@ -190,45 +191,96 @@ const Trade = ({
           )}
 
           <div className="balance-display">
-            <h5 style={{ marginBottom: '10px', color: '#333' }}>Current Balances:</h5>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '15px' }}>
-              <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', textAlign: 'center' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>USDC</div>
+            <h5 style={{ marginBottom: '10px', color: '#333' }}>
+              Current Balances:
+            </h5>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: '10px',
+                marginBottom: '15px',
+              }}
+            >
+              <div
+                style={{
+                  padding: '8px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '4px',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#666',
+                    marginBottom: '4px',
+                  }}
+                >
+                  USDC
+                </div>
                 <div style={{ fontWeight: 'bold', color: '#0066cc' }}>
-                  {usdcPurse 
+                  {usdcPurse
                     ? stringifyAmountValue(
                         usdcPurse.currentAmount,
                         usdcPurse.displayInfo.assetKind,
                         usdcPurse.displayInfo.decimalPlaces,
                       )
-                    : 'Loading...'
-                  }
+                    : 'Loading...'}
                 </div>
               </div>
-              <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', textAlign: 'center' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>BLD</div>
+              <div
+                style={{
+                  padding: '8px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '4px',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#666',
+                    marginBottom: '4px',
+                  }}
+                >
+                  BLD
+                </div>
                 <div style={{ fontWeight: 'bold', color: '#dc3545' }}>
-                  {bldPurse 
+                  {bldPurse
                     ? stringifyAmountValue(
                         bldPurse.currentAmount,
                         bldPurse.displayInfo.assetKind,
                         bldPurse.displayInfo.decimalPlaces,
                       )
-                    : 'Loading...'
-                  }
+                    : 'Loading...'}
                 </div>
               </div>
-              <div style={{ padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', textAlign: 'center' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>PoC26</div>
+              <div
+                style={{
+                  padding: '8px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '4px',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#666',
+                    marginBottom: '4px',
+                  }}
+                >
+                  PoC26
+                </div>
                 <div style={{ fontWeight: 'bold', color: '#28a745' }}>
-                  {poc26Purse 
+                  {poc26Purse
                     ? stringifyAmountValue(
                         poc26Purse.currentAmount,
                         poc26Purse.displayInfo.assetKind,
                         poc26Purse.displayInfo.decimalPlaces,
                       )
-                    : 'Loading...'
-                  }
+                    : 'Loading...'}
                 </div>
               </div>
             </div>
@@ -245,44 +297,17 @@ const Trade = ({
         </div>
 
         <div className="option-card">
-          <h4>Option 2: Open Empty Portfolio</h4>
-          <div className="info-section">
-            <p>
-              This option will open a new portfolio without requiring any USDC
-              deposit.
-            </p>
-            <p>
-              Use this if you just want to create a portfolio without opening a
-              position.
-            </p>
-          </div>
-        </div>
+          <h4>Option 2: Settle Transaction</h4>
 
-        <div className="option-card">
-          <h4>Option 3: Settle Transaction</h4>
-          
           <div className="input-row">
             <div className="input-group">
-              <label htmlFor="settle-amount">Amount:</label>
+              <label htmlFor="tx-id">Transaction ID:</label>
               <input
-                id="settle-amount"
-                type="number"
-                step="1"
-                min="1"
-                value={settleTxAmount}
-                onChange={e => setSettleTxAmount(e.target.value)}
-                placeholder="Enter amount"
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="remote-address">Remote Address:</label>
-              <input
-                id="remote-address"
+                id="tx-id"
                 type="text"
-                value={remoteAddress}
-                onChange={e => setRemoteAddress(e.target.value)}
-                placeholder="Enter remote address"
+                value={txId}
+                onChange={e => setTxId(e.target.value)}
+                placeholder="Enter transaction ID"
               />
             </div>
           </div>
@@ -296,27 +321,29 @@ const Trade = ({
                 onChange={e => setTxStatus(e.target.value)}
                 className="chain-selector"
               >
-                <option value="confirmed">Confirmed</option>
-                <option value="pending">Pending</option>
+                <option value="success">Success</option>
                 <option value="failed">Failed</option>
               </select>
             </div>
+          </div>
 
+          <div className="input-row">
             <div className="input-group">
-              <label htmlFor="axelar-chain">Remote Axelar Chain:</label>
+              <label htmlFor="prev-offer-id">Previous Offer ID:</label>
               <input
-                id="axelar-chain"
+                id="prev-offer-id"
                 type="text"
-                value={remoteAxelarChain}
-                onChange={e => setRemoteAxelarChain(e.target.value)}
-                placeholder="Enter Axelar chain ID"
+                value={prevOfferId}
+                onChange={e => setPrevOfferId(e.target.value)}
+                placeholder="Enter previous offer ID"
               />
             </div>
           </div>
 
           <div className="info-section">
             <p>
-              This option will settle a CCTP transaction using the provided details.
+              This option will settle a CCTP transaction using the provided
+              details.
             </p>
           </div>
         </div>
