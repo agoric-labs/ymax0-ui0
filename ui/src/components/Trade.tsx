@@ -10,6 +10,11 @@ type TradeProps = {
     evmChain?: EVMChain,
   ) => void;
   withdrawUSDC: () => void;
+  withdrawFromProtocol: (
+    withdrawAmount: bigint,
+    fromProtocol: YieldProtocol,
+    evmChain?: EVMChain,
+  ) => void;
   openEmptyPortfolio: () => void;
   acceptInvitation: () => void;
   settleTransaction: (
@@ -29,6 +34,7 @@ type TradeProps = {
 const Trade = ({
   makeOffer,
   withdrawUSDC,
+  withdrawFromProtocol,
   openEmptyPortfolio,
   acceptInvitation,
   settleTransaction,
@@ -50,6 +56,12 @@ const Trade = ({
   const [prevOfferId, setPrevOfferId] = useState<string>(
     'redeem-2025-09-08T12:18:15.933Z ',
   );
+
+  // Withdraw form state
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('0.5');
+  const [withdrawFromProtocolState, setWithdrawFromProtocolState] = 
+    useState<YieldProtocol>('Aave');
+  const [withdrawEvmChain, setWithdrawEvmChain] = useState<EVMChain>('Avalanche');
 
   // Handle making an offer
   const handleMakeOffer = () => {
@@ -92,6 +104,22 @@ const Trade = ({
   // Handle settle transaction
   const handleSettleTransaction = () => {
     settleTransaction(txId.trim(), txStatus, prevOfferId.trim());
+  };
+
+  // Handle protocol-specific withdraw
+  const handleWithdrawFromProtocol = () => {
+    // Convert withdraw amount to bigint (USDC has 6 decimal places)
+    const withdrawValue = BigInt(
+      Math.floor(parseFloat(withdrawAmount.trim()) * 1_000_000),
+    );
+
+    // Only pass the EVM chain if Aave or Compound is selected
+    const evmChainParam =
+      withdrawFromProtocolState === 'Aave' || withdrawFromProtocolState === 'Compound'
+        ? withdrawEvmChain
+        : undefined;
+
+    withdrawFromProtocol(withdrawValue, withdrawFromProtocolState, evmChainParam);
   };
 
   return (
@@ -186,6 +214,7 @@ const Trade = ({
               >
                 <option value="Avalanche">Avalanche</option>
                 <option value="Arbitrum">Arbitrum</option>
+                <option value="Ethereum">Ethereum</option>
               </select>
             </div>
           )}
@@ -297,7 +326,85 @@ const Trade = ({
         </div>
 
         <div className="option-card">
-          <h4>Option 2: Settle Transaction</h4>
+          <h4>Option 2: Withdraw from Protocol</h4>
+
+          <div className="input-row">
+            <div className="input-group">
+              <label htmlFor="withdraw-amount">Withdraw Amount (USDC):</label>
+              <input
+                id="withdraw-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={withdrawAmount}
+                onChange={e => setWithdrawAmount(e.target.value)}
+                placeholder="Enter amount to withdraw"
+              />
+            </div>
+          </div>
+
+          <div className="input-group position-select">
+            <label>Withdraw From Protocol:</label>
+            <div className="radio-group">
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="withdrawProtocol"
+                  value="USDN"
+                  checked={withdrawFromProtocolState === 'USDN'}
+                  onChange={() => setWithdrawFromProtocolState('USDN')}
+                />
+                USDN
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="withdrawProtocol"
+                  value="Aave"
+                  checked={withdrawFromProtocolState === 'Aave'}
+                  onChange={() => setWithdrawFromProtocolState('Aave')}
+                />
+                Aave
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="withdrawProtocol"
+                  value="Compound"
+                  checked={withdrawFromProtocolState === 'Compound'}
+                  onChange={() => setWithdrawFromProtocolState('Compound')}
+                />
+                Compound
+              </label>
+            </div>
+          </div>
+
+          {/* EVM Chain Selector for withdraw - only visible when Aave or Compound is selected */}
+          {(withdrawFromProtocolState === 'Aave' || withdrawFromProtocolState === 'Compound') && (
+            <div className="chain-select">
+              <label htmlFor="withdraw-evm-chain">EVM Chain:</label>
+              <select
+                id="withdraw-evm-chain"
+                value={withdrawEvmChain}
+                onChange={e => setWithdrawEvmChain(e.target.value as EVMChain)}
+                className="chain-selector"
+              >
+                <option value="Avalanche">Avalanche</option>
+                <option value="Arbitrum">Arbitrum</option>
+                <option value="Ethereum">Ethereum</option>
+              </select>
+            </div>
+          )}
+
+          <div className="info-section">
+            <p>
+              This will withdraw the specified amount from your selected protocol position back to your USDC balance.
+            </p>
+          </div>
+        </div>
+
+        <div className="option-card">
+          <h4>Option 3: Settle Transaction</h4>
 
           <div className="input-row">
             <div className="input-group">
@@ -375,11 +482,16 @@ const Trade = ({
               Settle transaction
             </button>
 
-            {offerId && (
-              <button onClick={handleWithdraw} className="withdraw-button">
-                Withdraw USDC
-              </button>
-            )}
+            <button onClick={handleWithdraw} className="withdraw-button">
+              Withdraw USDC (Legacy)
+            </button>
+            
+            <button
+              onClick={handleWithdrawFromProtocol}
+              className="withdraw-protocol-button"
+            >
+              Withdraw from Protocol
+            </button>
           </div>
         ) : (
           <p>Please connect your wallet to make an offer.</p>

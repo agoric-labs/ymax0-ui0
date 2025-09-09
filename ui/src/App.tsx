@@ -14,10 +14,16 @@ import { subscribeLatest } from '@agoric/notifier';
 import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
-import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
+import {
+  makePortfolioSteps,
+  MovementDesc,
+  YieldProtocol,
+  EVMChain,
+} from './ymax-client.ts';
 import { getBrand } from './utils';
-import type { Environment, AppState, YieldProtocol } from './types';
+import type { Environment, AppState } from './types';
 import { getInitialEnvironment, configureEndpoints } from './config';
+import { off } from 'process';
 
 const { fromEntries } = Object;
 
@@ -206,8 +212,7 @@ const withdrawUSDC = () => {
       source: 'continuing',
       previousOffer: offerId,
       instance: offerUpInstance,
-      invitationMakerName: 'makeWithdrawInvitation',
-      publicInvitationMaker: 'makeWithdrawInvitation',
+      publicInvitationMaker: 'Rebalance',
       description: 'Withdraw USDC',
       fee: {
         gas: 400000,
@@ -231,6 +236,116 @@ const withdrawUSDC = () => {
       if (update.status === 'refunded') {
         console.log('Withdraw rejected:', update.data);
         alert(`Withdraw rejected: ${offerDetails}`);
+      }
+    },
+  );
+};
+
+const withdrawFromProtocol = (
+  withdrawAmount: bigint,
+  fromProtocol: YieldProtocol,
+  evmChain?: EVMChain,
+) => {
+  const { wallet, offerUpInstance, purses } = useAppStore.getState();
+  if (!offerUpInstance) {
+    alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
+    throw Error('no contract instance');
+  }
+
+  const offerId = 'open-2025-09-09T09:22:08.444Z';
+
+  if (!offerId) {
+    alert('No previous offer ID found. Please make an initial offer first.');
+    return;
+  }
+
+  const usdcBrand = getBrand(purses, 'usdc');
+  if (!usdcBrand) {
+    alert('Required brand (USDC) is not available in purses.');
+    return;
+  }
+
+  const bldBrand = getBrand(purses, 'bld');
+  if (!bldBrand) {
+    alert('Required brand (BLD) is not available in purses.');
+    return;
+  }
+
+  const proposal = {
+    want: { Cash: { brand: usdcBrand as Brand<'nat'>, value: withdrawAmount } },
+  };
+
+  console.log('Making continuing offer to withdraw from protocol with:', {
+    previousOffer: offerId,
+    instance: offerUpInstance,
+    proposal,
+    fromProtocol,
+    evmChain,
+  });
+
+  const amount = proposal.want.Cash;
+  const steps: MovementDesc[] = [];
+
+  // Default fee amount (2 BLD = 2,000,000 micro-BLD)
+  const defaultFee = { brand: bldBrand as Brand<'nat'>, value: 15_000_000n };
+
+  // Create withdrawal steps based on protocol
+  switch (fromProtocol) {
+    case 'USDN':
+      steps.push(
+        { src: 'USDNVault', dest: '@noble', amount },
+        { src: '@noble', dest: '@agoric', amount },
+        { src: '@agoric', dest: '<Cash>', amount },
+      );
+      break;
+    case 'Aave':
+    case 'Compound':
+      const chain = evmChain || 'Avalanche';
+      steps.push(
+        {
+          src: `${fromProtocol}_${chain}`,
+          dest: `@${chain}`,
+          amount,
+          fee: defaultFee,
+        },
+        { src: `@${chain}`, dest: '@noble', amount, fee: defaultFee },
+        { src: '@noble', dest: '@agoric', amount },
+        { src: '@agoric', dest: '<Cash>', amount },
+      );
+      break;
+    default:
+      alert(`Unsupported protocol: ${fromProtocol}`);
+      return;
+  }
+
+  wallet?.makeOffer(
+    {
+      source: 'continuing',
+      previousOffer: offerId,
+      instance: offerUpInstance,
+      invitationMakerName: 'Rebalance',
+      description: `Withdraw from ${fromProtocol}${evmChain ? ` on ${evmChain}` : ''}`,
+    },
+    proposal,
+    { flow: steps },
+    (update: { status: string; data?: unknown }) => {
+      console.log('Protocol withdraw offer update:', update);
+
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
+      const offerDetails = JSON.stringify(update, bigintReplacer, 2);
+
+      if (update.status === 'error') {
+        console.error('Protocol withdraw error:', update.data);
+        alert(`Protocol withdraw error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log('Protocol withdraw accepted:', update.data);
+        alert(`Protocol withdraw accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log('Protocol withdraw rejected:', update.data);
+        alert(`Protocol withdraw rejected: ${offerDetails}`);
       }
     },
   );
@@ -308,14 +423,23 @@ const acceptInvitation = () => {
     purse => purse.brandPetname === 'Invitation',
   );
 
-  const firstPurseBalance = invitationPurse?.currentAmount.value[0];
+  const firstPurseBalance = invitationPurse?.currentAmount.value;
   // Get the first purse instance as specified in the template
+
+  if (
+    !firstPurseBalance ||
+    typeof firstPurseBalance === 'bigint' ||
+    !Array.isArray(firstPurseBalance)
+  ) {
+    alert('Invalid invitation purse balance format');
+    return;
+  }
 
   const offer = {
     id: Date.now(),
     invitationSpec: {
       source: 'purse',
-      instance: firstPurseBalance.instance,
+      instance: firstPurseBalance[0].instance,
       description: 'resolver',
     },
     proposal: { give: {}, want: {} },
@@ -547,6 +671,7 @@ function App() {
                 makeOffer(usdcAmount, bldFeeAmount, yProtocol)
               }
               withdrawUSDC={withdrawUSDC}
+              withdrawFromProtocol={withdrawFromProtocol}
               openEmptyPortfolio={openEmptyPortfolio}
               acceptInvitation={acceptInvitation}
               settleTransaction={settleTransaction}
