@@ -16,25 +16,23 @@ import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
-import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
-import { getBrand } from './utils';
+import { makePortfolioSteps } from './ymax-client.ts';
 import type {
   Environment,
   AppState,
   YieldProtocol,
   EVMChain,
-} from './ymax-client.ts';
+  MovementDesc,
+} from './types';
 import { getBrand } from './utils';
-import type { Environment, AppState } from './types';
 import { getInitialEnvironment, configureEndpoints } from './config';
-import { off } from 'process';
 
 const { fromEntries } = Object;
 
 let ENDPOINTS = configureEndpoints(getInitialEnvironment(), true);
 let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
-const useAppStore = create<AppState>(() => ({}));
+const useAppStore = create<AppState>(() => ({} as AppState));
 
 const setup = async () => {
   watcher.watchLatest<Array<[string, unknown]>>(
@@ -437,7 +435,7 @@ const acceptInvitation = () => {
   }
 
   const invitationPurse = purses.find(
-    purse => purse.brandPetname === 'Invitation',
+    (purse: Purse) => purse.brandPetname === 'Invitation',
   );
 
   const firstPurseBalance = invitationPurse?.currentAmount.value;
@@ -594,7 +592,6 @@ const signAndBroadcastAction = (publicInvitationMaker: string) => {
 };
 
 const MainPage = () => {
-
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
@@ -656,17 +653,17 @@ const MainPage = () => {
   }, []);
 
   const { wallet, purses, offerId } = useAppStore(
-    ({ wallet, purses, offerId }) => ({
-      wallet,
-      purses,
-      offerId,
+    (state: AppState) => ({
+      wallet: state.wallet,
+      purses: state.purses,
+      offerId: state.offerId,
     }),
   );
-  const istPurse = purses?.find(p => p.brandPetname === 'IST');
-  const itemsPurse = purses?.find(p => p.brandPetname === 'Items');
-  const usdcPurse = purses?.find(p => p.brandPetname === 'USDC');
-  const bldPurse = purses?.find(p => p.brandPetname === 'BLD');
-  const poc26Purse = purses?.find(p => p.brandPetname === 'PoC26');
+  const istPurse = purses?.find((p: Purse) => p.brandPetname === 'IST');
+  const itemsPurse = purses?.find((p: Purse) => p.brandPetname === 'Items');
+  const usdcPurse = purses?.find((p: Purse) => p.brandPetname === 'USDC');
+  const bldPurse = purses?.find((p: Purse) => p.brandPetname === 'BLD');
+  const poc26Purse = purses?.find((p: Purse) => p.brandPetname === 'PoC26');
 
   const handleEnvironmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newEnvironment = e.target.value as Environment;
@@ -769,11 +766,13 @@ function App() {
     setup();
   }, []);
 
-  const { wallet, instances, purses } = useAppStore(({ wallet, instances, purses }) => ({
-    wallet,
-    instances,
-    purses,
-  }));
+  const { wallet, instances, purses } = useAppStore(
+    (state: AppState) => ({
+      wallet: state.wallet,
+      instances: state.instances,
+      purses: state.purses,
+    }),
+  );
 
   return (
     <Routes>
