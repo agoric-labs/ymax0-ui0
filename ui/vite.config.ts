@@ -16,6 +16,6 @@ export default defineConfig({
     environment: 'happy-dom',
     testTimeout: 20000, // 20 seconds for puppeteer CI
     // modified import('vitest/dist/config.js').defaultInclude
-    include: '**/*.{spec,e2e}.?(c|m)[jt]s?(x)',
+    include: ['src/**/*.spec.?(c|m)[jt]s?(x)'],
   },
 });
