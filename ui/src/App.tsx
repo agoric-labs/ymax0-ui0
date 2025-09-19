@@ -260,6 +260,7 @@ const withdrawFromProtocol = (
   withdrawAmount: bigint,
   fromProtocol: YieldProtocol,
   evmChain?: EVMChain,
+  prevOfferId?: string,
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -267,7 +268,7 @@ const withdrawFromProtocol = (
     throw Error('no contract instance');
   }
 
-  const offerId = 'open-2025-09-09T09:22:08.444Z';
+  const offerId = prevOfferId || 'open-2025-09-19T09:25:20.918Z';
 
   if (!offerId) {
     alert('No previous offer ID found. Please make an initial offer first.');

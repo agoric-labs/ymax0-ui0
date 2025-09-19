@@ -14,6 +14,7 @@ type TradeProps = {
     withdrawAmount: bigint,
     fromProtocol: YieldProtocol,
     evmChain?: EVMChain,
+    prevOfferId?: string,
   ) => void;
   openEmptyPortfolio: () => void;
   acceptInvitation: () => void;
@@ -54,14 +55,18 @@ const Trade = ({
   const [txId, setTxId] = useState<string>('');
   const [txStatus, setTxStatus] = useState<string>('success');
   const [prevOfferId, setPrevOfferId] = useState<string>(
-    'redeem-2025-09-08T12:18:15.933Z ',
+    'redeem-2025-09-17T09:19:35.351Z',
   );
 
   // Withdraw form state
   const [withdrawAmount, setWithdrawAmount] = useState<string>('0.5');
-  const [withdrawFromProtocolState, setWithdrawFromProtocolState] = 
+  const [withdrawFromProtocolState, setWithdrawFromProtocolState] =
     useState<YieldProtocol>('Aave');
-  const [withdrawEvmChain, setWithdrawEvmChain] = useState<EVMChain>('Avalanche');
+  const [withdrawEvmChain, setWithdrawEvmChain] =
+    useState<EVMChain>('Avalanche');
+  const [withdrawPrevOfferId, setWithdrawPrevOfferId] = useState<string>(
+    'open-2025-09-19T09:25:20.918Z',
+  );
 
   // Handle making an offer
   const handleMakeOffer = () => {
@@ -115,11 +120,17 @@ const Trade = ({
 
     // Only pass the EVM chain if Aave or Compound is selected
     const evmChainParam =
-      withdrawFromProtocolState === 'Aave' || withdrawFromProtocolState === 'Compound'
+      withdrawFromProtocolState === 'Aave' ||
+      withdrawFromProtocolState === 'Compound'
         ? withdrawEvmChain
         : undefined;
 
-    withdrawFromProtocol(withdrawValue, withdrawFromProtocolState, evmChainParam);
+    withdrawFromProtocol(
+      withdrawValue,
+      withdrawFromProtocolState,
+      evmChainParam,
+      withdrawPrevOfferId.trim(),
+    );
   };
 
   return (
@@ -343,6 +354,19 @@ const Trade = ({
             </div>
           </div>
 
+          <div className="input-row">
+            <div className="input-group">
+              <label htmlFor="withdraw-prev-offer-id">Previous Offer ID:</label>
+              <input
+                id="withdraw-prev-offer-id"
+                type="text"
+                value={withdrawPrevOfferId}
+                onChange={e => setWithdrawPrevOfferId(e.target.value)}
+                placeholder="Enter previous offer ID"
+              />
+            </div>
+          </div>
+
           <div className="input-group position-select">
             <label>Withdraw From Protocol:</label>
             <div className="radio-group">
@@ -380,7 +404,8 @@ const Trade = ({
           </div>
 
           {/* EVM Chain Selector for withdraw - only visible when Aave or Compound is selected */}
-          {(withdrawFromProtocolState === 'Aave' || withdrawFromProtocolState === 'Compound') && (
+          {(withdrawFromProtocolState === 'Aave' ||
+            withdrawFromProtocolState === 'Compound') && (
             <div className="chain-select">
               <label htmlFor="withdraw-evm-chain">EVM Chain:</label>
               <select
@@ -398,7 +423,8 @@ const Trade = ({
 
           <div className="info-section">
             <p>
-              This will withdraw the specified amount from your selected protocol position back to your USDC balance.
+              This will withdraw the specified amount from your selected
+              protocol position back to your USDC balance.
             </p>
           </div>
         </div>
@@ -485,7 +511,7 @@ const Trade = ({
             <button onClick={handleWithdraw} className="withdraw-button">
               Withdraw USDC (Legacy)
             </button>
-            
+
             <button
               onClick={handleWithdrawFromProtocol}
               className="withdraw-protocol-button"
