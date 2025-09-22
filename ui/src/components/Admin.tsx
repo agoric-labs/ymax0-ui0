@@ -2,13 +2,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getInitialEnvironment, configureEndpoints } from '../config';
 import { makeVstorageKit, makeVStorage } from '@agoric/client-utils';
 import { makeAgoricChainStorageWatcher, AgoricChainStoragePathKind as Kind } from '@agoric/rpc';
-import { reifyWalletEntry } from '../walletEntryProxy';
 import type { Environment } from '../types';
 import WalletEntriesCard from './WalletEntriesCard';
 import ContractControlCard from './ContractControlCard';
 import CreatorFacetCard from './CreatorFacetCard';
 import TransactionHistory from './TransactionHistory';
 import { formatActionColumn, extractSaveResultName } from './Admin.utils.tsx';
+import { ContractService } from '../services/contractService';
+import { redeemInvitation } from '../services/walletService';
 
 type AdminProps = {
   signAndBroadcastAction: (invitationMaker: string) => void;
@@ -54,6 +55,17 @@ const Admin: React.FC<AdminProps> = ({
   const [pendingInvocations, setPendingInvocations] = useState<Set<number>>(new Set());
   const [walletUpdates, setWalletUpdates] = useState<any[]>([]);
 
+  // Initialize contract service
+  const contractService = new ContractService({
+    wallet,
+    keplr,
+    chainId: chainId || '',
+    marshaller: watcherRef.current?.marshaller,
+    rpcEndpoint: ENDPOINTS.RPC,
+    instances,
+    instanceInfo
+  });
+
   // Helper function to track invocations consistently
   const trackInvocation = (tools: any, method: string, targetName: string) => {
     const invocationId = Date.now();
@@ -94,243 +106,84 @@ const Admin: React.FC<AdminProps> = ({
   };
 
   const handleTerminate = async () => {
-    if (!wallet || !keplr || !chainId || !watcherRef.current) {
-      alert('Wallet, Keplr, chain ID, or watcher not available');
-      return;
-    }
-
     try {
-      // Get board ID for target confirmation
-      const ymax0Instance = instanceInfo?.ymax0 ? instances?.find(([n]) => n === 'ymax0')?.[1] : null;
-      const [boardId] = ymax0Instance ? watcherRef.current.marshaller.toCapData(ymax0Instance).slots : [''];
+      const result = await contractService.terminate(terminateMessage, trackInvocation);
       
-      const { target, tools } = reifyWalletEntry<{ terminate: (args?: { message?: string; target?: string }) => Promise<any> }>({
-        targetName: 'ymaxControl',
-        wallet,
-        keplr,
-        chainId,
-        marshaller: watcherRef.current.marshaller,
-        rpcEndpoint: ENDPOINTS.RPC,
-      });
-
-      const invocationId = trackInvocation(tools, 'terminate', 'ymaxControl');
-
-      const terminateArgs: { message?: string; target?: string } = {};
-      if (terminateMessage.trim()) {
-        terminateArgs.message = terminateMessage;
+      if (result.success) {
+        setTerminateMessage(''); // Clear the form
       }
-      if (boardId) {
-        terminateArgs.target = boardId;
-      }
-
-      await target.terminate(Object.keys(terminateArgs).length > 0 ? terminateArgs : undefined);
-      alert('Terminate action submitted successfully');
-      setTerminateMessage(''); // Clear the form
+      
+      alert(result.message);
     } catch (error) {
-      console.error('Terminate action failed:', error);
       alert(`Terminate action failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleUpgrade = async () => {
-    if (!wallet || !keplr || !chainId || !watcherRef.current) {
-      alert('Wallet, Keplr, chain ID, or watcher not available');
-      return;
-    }
-
-    if (!upgradeBundleId.trim()) {
-      alert('Please enter a bundle ID');
-      return;
-    }
-
     try {
-      const { target, tools } = reifyWalletEntry<{ upgrade: (bundleId: string) => Promise<any> }>({
-        targetName: 'ymaxControl',
-        wallet,
-        keplr,
-        chainId,
-        marshaller: watcherRef.current.marshaller,
-        rpcEndpoint: ENDPOINTS.RPC,
-      });
-
-      const invocationId = trackInvocation(tools, 'upgrade', 'ymaxControl');
-
-      await target.upgrade(upgradeBundleId);
-      alert('Upgrade action submitted successfully');
-      setUpgradeBundleId(''); // Clear the form
+      const result = await contractService.upgrade(upgradeBundleId, trackInvocation);
+      
+      if (result.success) {
+        setUpgradeBundleId(''); // Clear the form
+      }
+      
+      alert(result.message);
     } catch (error) {
-      console.error('Upgrade action failed:', error);
       alert(`Upgrade action failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleInstallAndStart = async () => {
-    if (!wallet || !keplr || !chainId || !watcherRef.current) {
-      alert('Wallet, Keplr, chain ID, or watcher not available');
-      return;
-    }
-
-    if (!installBundleId.trim()) {
-      alert('Please enter a bundle ID');
-      return;
-    }
-
     try {
-      const { target, tools } = reifyWalletEntry<{ installAndStart: (args: { bundleId: string; issuers: any }) => Promise<any> }>({
-        targetName: 'ymaxControl',
-        wallet,
-        keplr,
-        chainId,
-        marshaller: watcherRef.current.marshaller,
-        rpcEndpoint: ENDPOINTS.RPC,
-      });
-
-      const invocationId = trackInvocation(tools, 'installAndStart', 'ymaxControl');
-
-      // TODO: Get actual issuers from agoricNames
-      const issuers = {}; // Placeholder
-      await target.installAndStart({ bundleId: installBundleId, issuers });
-      alert('Install and start action submitted successfully');
-      setInstallBundleId(''); // Clear the form
+      const result = await contractService.installAndStart(installBundleId, trackInvocation);
+      
+      if (result.success) {
+        setInstallBundleId(''); // Clear the form
+      }
+      
+      alert(result.message);
     } catch (error) {
-      console.error('Install and start action failed:', error);
       alert(`Install and start action failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleGetCreatorFacet = async () => {
-    if (!wallet || !keplr || !chainId || !watcherRef.current) {
-      alert('Wallet, Keplr, chain ID, or watcher not available');
-      return;
-    }
-
-    if (!creatorFacetName.trim()) {
-      alert('Please enter a name to save the creator facet');
-      return;
-    }
-
     try {
-      const { target, tools } = reifyWalletEntry<{ getCreatorFacet: () => Promise<any> }>({
-        targetName: 'ymaxControl',
-        wallet,
-        keplr,
-        chainId,
-        marshaller: watcherRef.current.marshaller,
-        rpcEndpoint: ENDPOINTS.RPC,
-      });
-
-      tools.setName(creatorFacetName, true);
-      const invocationId = trackInvocation(tools, 'getCreatorFacet', 'ymaxControl');
+      const result = await contractService.getCreatorFacet(creatorFacetName, trackInvocation);
       
-      await target.getCreatorFacet();
-      alert(`Creator facet retrieved and saved as "${creatorFacetName}"`);
+      alert(result.message);
     } catch (error) {
-      console.error('Get creator facet failed:', error);
       alert(`Get creator facet failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleDeliverPlannerInvitation = async () => {
-    if (!wallet || !keplr || !chainId || !watcherRef.current) {
-      alert('Wallet, Keplr, chain ID, or watcher not available');
-      return;
-    }
-
-    if (!plannerAddress.trim()) {
-      alert('Please enter a planner address');
-      return;
-    }
-
     try {
-      const postalServiceInstance = instanceInfo?.postalService ? instances?.find(([n]) => n === 'postalService')?.[1] : null;
+      const result = await contractService.deliverPlannerInvitation(plannerAddress, trackInvocation);
       
-      const { target, tools } = reifyWalletEntry<{ deliverPlannerInvitation: (planner: string, postalService: any) => Promise<any> }>({
-        targetName: 'creatorFacet',
-        wallet,
-        keplr,
-        chainId,
-        marshaller: watcherRef.current.marshaller,
-        rpcEndpoint: ENDPOINTS.RPC,
-      });
-
-      const invocationId = trackInvocation(tools, 'deliverPlannerInvitation', 'creatorFacet');
-
-      await target.deliverPlannerInvitation(plannerAddress, postalServiceInstance);
-      alert('Planner invitation delivered successfully');
-      setPlannerAddress(''); // Clear the form
+      if (result.success) {
+        setPlannerAddress(''); // Clear the form
+      }
+      
+      alert(result.message);
     } catch (error) {
-      console.error('Deliver planner invitation failed:', error);
       alert(`Deliver planner invitation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleRedeemInvitation = async (description: string, saveName: string, replace: boolean) => {
-    if (!wallet || !keplr || !chainId || !watcherRef.current) {
-      alert('Wallet, Keplr, chain ID, or watcher not available');
-      return;
-    }
-
-    if (!saveName.trim()) {
-      alert('Please enter a name to save the result');
-      return;
-    }
-
     try {
-      // Find the invitation with matching description from the purse
-      const invitationPurse = purses?.find((p: any) => p.brandPetname === 'Invitation');
-      if (!invitationPurse?.currentAmount?.value || !Array.isArray(invitationPurse.currentAmount.value)) {
-        alert('No invitations found in purse');
-        return;
-      }
-
-      // Description is the actual description, but we need to find the invitation by index
-      // The invitation list stores [description, index] pairs
-      const invitationEntry = invitations.find(([desc]) => desc === description);
-      if (!invitationEntry) {
-        alert(`Invitation with description "${description}" not found`);
-        return;
-      }
+      await redeemInvitation({
+        description,
+        saveName,
+        replace,
+        invitations,
+        purses,
+        wallet,
+        setPendingEntries
+      });
       
-      const invitationIndex = invitationEntry[1] as number;
-      const invitation = invitationPurse.currentAmount.value[invitationIndex];
-      if (!invitation) {
-        alert(`Invitation not found at index ${invitationIndex}`);
-        return;
-      }
-
-      // Create offer to redeem invitation using the actual instance from the invitation
-      const offerId = `redeem-${new Date().toISOString()}`;
-      
-      await wallet.makeOffer(
-        {
-          source: 'purse',
-          instance: invitation.instance,
-          description: description,
-        },
-        {},
-        undefined,
-        (update: { status: string; data?: unknown }) => {
-          console.log('Redeem offer update:', update);
-          if (update.status === 'accepted') {
-            // Don't update state here - let the wallet watcher handle it
-            alert(`Successfully redeemed and saved as "${saveName}"`);
-          } else if (update.status === 'error') {
-            // Remove from pending on error
-            setPendingEntries(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(saveName);
-              return newSet;
-            });
-            alert(`Redeem failed: ${JSON.stringify(update.data)}`);
-          }
-        },
-        offerId,
-        { saveResult: { name: saveName, overwrite: replace } }
-      );
-
-      // Mark as pending immediately
-      setPendingEntries(prev => new Set([...prev, saveName]));
-      
+      alert(`Successfully redeemed and saved as "${saveName}"`);
     } catch (error) {
       console.error('Redeem invitation failed:', error);
       alert(`Redeem invitation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
