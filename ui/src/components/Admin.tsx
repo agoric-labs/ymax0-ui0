@@ -418,14 +418,22 @@ const Admin: React.FC<AdminProps> = ({
     }
   }, [transactions]);
 
-  // Handle URL parameter for watch mode
+  // Handle URL parameter for watch mode and set default addresses
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const watchParam = urlParams.get('watch');
     if (watchParam) {
       setWatchAddress(watchParam);
+    } else if (!wallet) {
+      // Set default watch address based on environment
+      const defaultAddresses = {
+        devnet: 'agoric10utru593dspjwfewcgdak8lvp9tkz0xttvcnxv',
+        mainnet: 'agoric1e80twfutmrm3wrk3fysjcnef4j82mq8dn6nmcq',
+        localhost: ''
+      };
+      setWatchAddress(defaultAddresses[environment] || '');
     }
-  }, []);
+  }, [environment]);
 
   const handleWatchAddress = () => {
     if (watchAddress.trim()) {
