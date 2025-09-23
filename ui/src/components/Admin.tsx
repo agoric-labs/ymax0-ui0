@@ -486,7 +486,29 @@ const Admin: React.FC<AdminProps> = ({
   if (!wallet && !watchAddress) {
     return (
       <div>
-        <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
+        <div style={{ position: 'relative', marginBottom: '1rem' }}>
+          <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
+          
+          <div className="environment-selector" style={{ position: 'absolute', top: 0, right: 0 }}>
+            <label htmlFor="environment-select">Env: </label>
+            <select
+              id="environment-select"
+              value={environment}
+              onChange={handleEnvironmentChange}
+            >
+              <option value="mainnet">Mainnet</option>
+              <option value="devnet">Devnet</option>
+              <option value="localhost">Localhost</option>
+            </select>
+            <div className="environment-info">
+              <small>
+                RPC: {ENDPOINTS.RPC}
+                <br />
+                API: {ENDPOINTS.API}
+              </small>
+            </div>
+          </div>
+        </div>
         {renderConnectionSection()}
       </div>
     );
