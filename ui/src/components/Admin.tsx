@@ -23,14 +23,15 @@ type AdminProps = {
 };
 
 // Separate data fetching logic from wallet operations
-const useWalletData = (wallet: any, purses: Array<Purse> | undefined, watcher: any) => {
+const useWalletData = (wallet: any, purses: Array<Purse> | undefined, watcher: any, watchAddress?: string) => {
   const [invitations, setInvitations] = useState<Array<[string, number]>>([]);
   const [savedEntries, setSavedEntries] = useState<Set<string>>(new Set());
   const [pendingEntries, setPendingEntries] = useState<Set<string>>(new Set());
   const [walletUpdates, setWalletUpdates] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!wallet || !watcher) return;
+    const effectiveAddress = wallet?.address || watchAddress;
+    if (!effectiveAddress || !watcher) return;
 
     // Get invitations from purses
     const invitationPurse = purses?.find((p: any) => p.brandPetname === 'Invitation');
@@ -43,7 +44,7 @@ const useWalletData = (wallet: any, purses: Array<Purse> | undefined, watcher: a
     }
 
     // Watch wallet's current state
-    const walletPath = `published.wallet.${wallet.address}.current`;
+    const walletPath = `published.wallet.${effectiveAddress}.current`;
     watcher.watchLatest<any>(
       [Kind.Data, walletPath],
       (walletRecord: any) => {
@@ -80,7 +81,7 @@ const useWalletData = (wallet: any, purses: Array<Purse> | undefined, watcher: a
     );
 
     // Watch for wallet updates
-    const walletUpdatesPath = `published.wallet.${wallet.address}`;
+    const walletUpdatesPath = `published.wallet.${effectiveAddress}`;
     watcher.watchLatest<any>(
       [Kind.Data, walletUpdatesPath],
       (walletData: any) => {
@@ -90,7 +91,7 @@ const useWalletData = (wallet: any, purses: Array<Purse> | undefined, watcher: a
       }
     );
     
-  }, [wallet, purses, watcher]);
+  }, [wallet, purses, watcher, watchAddress]);
 
   return { invitations, savedEntries, pendingEntries, walletUpdates, setSavedEntries };
 };
@@ -206,10 +207,14 @@ const Admin: React.FC<AdminProps> = ({
   const [plannerAddress, setPlannerAddress] = useState<string>('');
   const [transactionLimit, setTransactionLimit] = useState<number>(10);
 
+  // Watch-only mode state
+  const [watchAddress, setWatchAddress] = useState<string>('');
+
   // Use custom hooks for data management
-  const { transactions, setTransactions, fetchTransactions } = useTransactionData(wallet?.address, ENDPOINTS, transactionLimit);
+  const effectiveAddress = wallet?.address || watchAddress;
+  const { transactions, setTransactions, fetchTransactions } = useTransactionData(effectiveAddress, ENDPOINTS, transactionLimit);
   const { pendingInvocations, trackInvocation, handleInvocationCompletion } = useInvocationTracking();
-  const { invitations, savedEntries, pendingEntries, walletUpdates, setSavedEntries } = useWalletData(wallet, purses, watcherRef.current);
+  const { invitations, savedEntries, pendingEntries, walletUpdates, setSavedEntries } = useWalletData(wallet, purses, watcherRef.current, watchAddress);
 
   // Initialize contract service
   const contractService = new ContractService({
@@ -379,16 +384,16 @@ const Admin: React.FC<AdminProps> = ({
 
   // Handle invocation completions
   useEffect(() => {
-    if (!wallet || !watcherRef.current) return;
+    if (!effectiveAddress || !watcherRef.current) return;
 
-    const walletUpdatesPath = `published.wallet.${wallet.address}`;
+    const walletUpdatesPath = `published.wallet.${effectiveAddress}`;
     watcherRef.current.watchLatest<any>(
       [Kind.Data, walletUpdatesPath],
       (walletData) => {
         handleInvocationCompletion(walletData, fetchTransactions);
       }
     );
-  }, [wallet, watcherRef.current, handleInvocationCompletion, fetchTransactions]);
+  }, [effectiveAddress, watcherRef.current, handleInvocationCompletion, fetchTransactions]);
 
   // Extract saved entries from transaction history and merge with wallet state
   useEffect(() => {
@@ -413,22 +418,86 @@ const Admin: React.FC<AdminProps> = ({
     }
   }, [transactions]);
 
+  // Handle URL parameter for watch mode
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const watchParam = urlParams.get('watch');
+    if (watchParam) {
+      setWatchAddress(watchParam);
+    }
+  }, []);
 
-  // Render wallet connection prompt if no wallet
-  const renderWalletPrompt = () => (
-    <div>
-      <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
-      <p style={{ textAlign: 'left' }}>Please connect your wallet to continue.</p>
-      <button onClick={tryConnectWallet}>Connect Wallet</button>
+  const handleWatchAddress = () => {
+    if (watchAddress.trim()) {
+      // Update URL to reflect watch mode
+      const url = new URL(window.location.href);
+      url.searchParams.set('watch', watchAddress.trim());
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
+  // Render wallet connection or watch address input
+  const renderConnectionSection = () => (
+    <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
+      <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>Connection</h2>
+      
+      {wallet ? (
+        <div style={{ color: 'green', fontWeight: 'bold' }}>
+          ✅ Connected: {wallet.address}
+        </div>
+      ) : watchAddress ? (
+        <div style={{ color: 'blue', fontWeight: 'bold' }}>
+          👁️ Watching: {watchAddress}
+        </div>
+      ) : null}
+      
+      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
+        <button onClick={tryConnectWallet} disabled={!!wallet}>
+          {wallet ? 'Wallet Connected' : 'Connect Wallet'}
+        </button>
+        
+        <span>or</span>
+        
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Enter address to watch..."
+            value={watchAddress}
+            onChange={(e) => setWatchAddress(e.target.value)}
+            disabled={!!wallet}
+            style={{ 
+              padding: '0.5rem', 
+              border: '1px solid #ccc', 
+              borderRadius: '4px',
+              minWidth: '300px'
+            }}
+          />
+          <button 
+            onClick={handleWatchAddress}
+            disabled={!!wallet || !watchAddress.trim()}
+          >
+            Watch
+          </button>
+        </div>
+      </div>
     </div>
   );
 
-  if (!wallet) {
-    return renderWalletPrompt();
+  if (!wallet && !watchAddress) {
+    return (
+      <div>
+        <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
+        {renderConnectionSection()}
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div style={{ 
+      backgroundColor: !wallet && watchAddress ? '#f0f8ff' : 'white',
+      minHeight: '100vh',
+      padding: !wallet && watchAddress ? '1rem' : '0'
+    }}>
       <style>{`
         @keyframes pulse {
           0% { opacity: 1; }
@@ -437,7 +506,19 @@ const Admin: React.FC<AdminProps> = ({
         }
       `}</style>
       <div style={{ position: 'relative', marginBottom: '1rem' }}>
-        <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
+        <h1 style={{ textAlign: 'left' }}>
+          YMax Contract Control
+          {!wallet && watchAddress && (
+            <span style={{ 
+              fontSize: '0.6em', 
+              color: '#666', 
+              fontWeight: 'normal',
+              marginLeft: '1rem'
+            }}>
+              (Read-Only Mode)
+            </span>
+          )}
+        </h1>
         
         <div className="environment-selector" style={{ position: 'absolute', top: 0, right: 0 }}>
           <label htmlFor="environment-select">Env: </label>
@@ -460,13 +541,16 @@ const Admin: React.FC<AdminProps> = ({
         </div>
       </div>
 
+      {renderConnectionSection()}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <WalletEntriesCard
           invitations={invitations}
           savedEntries={savedEntries}
           pendingEntries={pendingEntries}
           onRedeemInvitation={handleRedeemInvitation}
-          walletAddress={wallet.address}
+          walletAddress={effectiveAddress}
+          readOnly={!wallet}
         />
 
         <ContractControlCard
@@ -485,6 +569,7 @@ const Admin: React.FC<AdminProps> = ({
           onTerminate={handleTerminate}
           onUpgrade={handleUpgrade}
           onInstallAndStart={handleInstallAndStart}
+          readOnly={!wallet}
         />
 
         <CreatorFacetCard
@@ -492,6 +577,7 @@ const Admin: React.FC<AdminProps> = ({
           setPlannerAddress={setPlannerAddress}
           savedEntries={savedEntries}
           onDeliverPlannerInvitation={handleDeliverPlannerInvitation}
+          readOnly={!wallet}
         />
 
         {pendingInvocations.size > 0 && (
@@ -532,7 +618,7 @@ const Admin: React.FC<AdminProps> = ({
         transactions={transactions} 
         transactionLimit={transactionLimit}
         onTransactionLimitChange={setTransactionLimit}
-        walletAddress={wallet?.address}
+        walletAddress={effectiveAddress}
         vsc={vstorageClient}
         marshaller={watcherRef.current?.marshaller}
         pendingInvocations={pendingInvocations}
