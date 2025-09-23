@@ -22,52 +22,111 @@ type AdminProps = {
   chainId?: string;
 };
 
-const Admin: React.FC<AdminProps> = ({
-  signAndBroadcastAction,
-  wallet,
-  tryConnectWallet,
-  instances,
-  purses,
-  keplr,
-  chainId,
-}) => {
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [instanceInfo, setInstanceInfo] = useState<{
-    ymax0?: string;
-    postalService?: string;
-  } | null>(null);
-  const [instanceBlockHeight, setInstanceBlockHeight] = useState<string | null>(null);
-  const [terminateMessage, setTerminateMessage] = useState<string>('');
-  const [upgradeBundleId, setUpgradeBundleId] = useState<string>('');
-  const [installBundleId, setInstallBundleId] = useState<string>('');
-  const [creatorFacetName, setCreatorFacetName] = useState<string>('creatorFacet');
-  const [plannerAddress, setPlannerAddress] = useState<string>('');
-  const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
-  const [ENDPOINTS, setENDPOINTS] = useState(configureEndpoints(getInitialEnvironment()));
-  const watcherRef = useRef<ReturnType<typeof makeAgoricChainStorageWatcher> | null>(null);
-  
-  // Wallet entries state
+// Separate data fetching logic from wallet operations
+const useWalletData = (wallet: any, purses: Array<Purse> | undefined, watcher: any) => {
   const [invitations, setInvitations] = useState<Array<[string, number]>>([]);
   const [savedEntries, setSavedEntries] = useState<Set<string>>(new Set());
   const [pendingEntries, setPendingEntries] = useState<Set<string>>(new Set());
-  const [transactionLimit, setTransactionLimit] = useState<number>(10);
-  const [vstorageClient, setVstorageClient] = useState<any>(null);
-  const [pendingInvocations, setPendingInvocations] = useState<Set<number>>(new Set());
   const [walletUpdates, setWalletUpdates] = useState<any[]>([]);
 
-  // Initialize contract service
-  const contractService = new ContractService({
-    wallet,
-    keplr,
-    chainId: chainId || '',
-    marshaller: watcherRef.current?.marshaller,
-    rpcEndpoint: ENDPOINTS.RPC,
-    instances,
-    instanceInfo
-  });
+  useEffect(() => {
+    if (!wallet || !watcher) return;
 
-  // Helper function to track invocations consistently
-  const trackInvocation = (tools: any, method: string, targetName: string) => {
+    // Get invitations from purses
+    const invitationPurse = purses?.find((p: any) => p.brandPetname === 'Invitation');
+    if (invitationPurse?.currentAmount?.value && Array.isArray(invitationPurse.currentAmount.value)) {
+      const invitationList = invitationPurse.currentAmount.value.map((invitation: any, index: number) => {
+        const desc = invitation.description || 'unknown';
+        return [desc, index] as [string, number];
+      });
+      setInvitations(invitationList);
+    }
+
+    // Watch wallet's current state
+    const walletPath = `published.wallet.${wallet.address}.current`;
+    watcher.watchLatest<any>(
+      [Kind.Data, walletPath],
+      (walletRecord: any) => {
+        if (walletRecord?.liveOffers) {
+          const currentPending = new Set<string>();
+          walletRecord.liveOffers.forEach(([offerId, offerSpec]: [string, any]) => {
+            if (offerSpec?.saveResult?.name) {
+              currentPending.add(offerSpec.saveResult.name);
+            }
+          });
+          setPendingEntries(currentPending);
+        }
+
+        if (walletRecord) {
+          const currentSaved = new Set<string>();
+          const walletInternalKeys = new Set([
+            'liveOffers', 
+            'offerToPublicSubscriberPaths', 
+            'offerToUsedInvitation',
+            'purses',
+            'offerToInvitationSpec'
+          ]);
+          
+          Object.keys(walletRecord).forEach(key => {
+            if (!walletInternalKeys.has(key) && 
+                typeof walletRecord[key] === 'object' && 
+                walletRecord[key] !== null) {
+              currentSaved.add(key);
+            }
+          });
+          setSavedEntries(currentSaved);
+        }
+      }
+    );
+
+    // Watch for wallet updates
+    const walletUpdatesPath = `published.wallet.${wallet.address}`;
+    watcher.watchLatest<any>(
+      [Kind.Data, walletUpdatesPath],
+      (walletData: any) => {
+        if (walletData && typeof walletData === 'object' && walletData.updated === 'invocation' && walletData.id && (walletData.result !== undefined || walletData.error)) {
+          setWalletUpdates(prev => [...prev, walletData]);
+        }
+      }
+    );
+    
+  }, [wallet, purses, watcher]);
+
+  return { invitations, savedEntries, pendingEntries, walletUpdates, setSavedEntries };
+};
+
+// Separate transaction fetching logic
+const useTransactionData = (walletAddress: string | undefined, endpoints: any, transactionLimit: number) => {
+  const [transactions, setTransactions] = useState<any[]>([]);
+
+  const fetchTransactions = async () => {
+    if (!walletAddress) return;
+    
+    const url = `${endpoints.API}/cosmos/tx/v1beta1/txs?query=message.sender='${walletAddress}'&order_by=ORDER_BY_DESC&limit=${transactionLimit}`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setTransactions(data.tx_responses || []);
+    } catch (error) {
+      console.error('Could not fetch transactions:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [walletAddress, endpoints, transactionLimit]);
+
+  return { transactions, setTransactions, fetchTransactions };
+};
+
+// Separate invocation tracking logic
+const useInvocationTracking = () => {
+  const [pendingInvocations, setPendingInvocations] = useState<Set<number>>(new Set());
+
+  const trackInvocation = (tools: any, method: string, targetName: string, wallet: any, setTransactions: any) => {
     const invocationId = Date.now();
     tools.setId(invocationId);
     setPendingInvocations(prev => new Set([...prev, invocationId]));
@@ -89,7 +148,7 @@ const Admin: React.FC<AdminProps> = ({
                   id: invocationId,
                   method,
                   targetName,
-                  args: [], // We don't have the actual args here
+                  args: [],
                 }
               })}`,
               slots: []
@@ -99,18 +158,81 @@ const Admin: React.FC<AdminProps> = ({
       }
     };
     
-    // Add to transactions list immediately
-    setTransactions(prev => [mockTransaction, ...prev]);
-    
+    setTransactions((prev: any[]) => [mockTransaction, ...prev]);
     return invocationId;
+  };
+
+  const handleInvocationCompletion = (walletData: any, fetchTransactions: () => void) => {
+    if (walletData && typeof walletData === 'object' && walletData.updated === 'invocation' && walletData.id && (walletData.result !== undefined || walletData.error)) {
+      setPendingInvocations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(walletData.id);
+        return newSet;
+      });
+      fetchTransactions();
+    }
+  };
+
+  return { pendingInvocations, trackInvocation, handleInvocationCompletion };
+};
+
+const Admin: React.FC<AdminProps> = ({
+  signAndBroadcastAction,
+  wallet,
+  tryConnectWallet,
+  instances,
+  purses,
+  keplr,
+  chainId,
+}) => {
+  // Environment and network state
+  const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
+  const [ENDPOINTS, setENDPOINTS] = useState(configureEndpoints(getInitialEnvironment()));
+  const watcherRef = useRef<ReturnType<typeof makeAgoricChainStorageWatcher> | null>(null);
+  const [vstorageClient, setVstorageClient] = useState<any>(null);
+  
+  // Instance state
+  const [instanceInfo, setInstanceInfo] = useState<{
+    ymax0?: string;
+    postalService?: string;
+  } | null>(null);
+  const [instanceBlockHeight, setInstanceBlockHeight] = useState<string | null>(null);
+  
+  // Form state
+  const [terminateMessage, setTerminateMessage] = useState<string>('');
+  const [upgradeBundleId, setUpgradeBundleId] = useState<string>('');
+  const [installBundleId, setInstallBundleId] = useState<string>('');
+  const [creatorFacetName, setCreatorFacetName] = useState<string>('creatorFacet');
+  const [plannerAddress, setPlannerAddress] = useState<string>('');
+  const [transactionLimit, setTransactionLimit] = useState<number>(10);
+
+  // Use custom hooks for data management
+  const { transactions, setTransactions, fetchTransactions } = useTransactionData(wallet?.address, ENDPOINTS, transactionLimit);
+  const { pendingInvocations, trackInvocation, handleInvocationCompletion } = useInvocationTracking();
+  const { invitations, savedEntries, pendingEntries, walletUpdates, setSavedEntries } = useWalletData(wallet, purses, watcherRef.current);
+
+  // Initialize contract service
+  const contractService = new ContractService({
+    wallet,
+    keplr,
+    chainId: chainId || '',
+    marshaller: watcherRef.current?.marshaller,
+    rpcEndpoint: ENDPOINTS.RPC,
+    instances,
+    instanceInfo
+  });
+
+  // Wrapper for trackInvocation with current context
+  const trackInvocationWithContext = (tools: any, method: string, targetName: string) => {
+    return trackInvocation(tools, method, targetName, wallet, setTransactions);
   };
 
   const handleTerminate = async () => {
     try {
-      const result = await contractService.terminate(terminateMessage, trackInvocation);
+      const result = await contractService.terminate(terminateMessage, trackInvocationWithContext);
       
       if (result.success) {
-        setTerminateMessage(''); // Clear the form
+        setTerminateMessage('');
       }
       
       alert(result.message);
@@ -121,10 +243,10 @@ const Admin: React.FC<AdminProps> = ({
 
   const handleUpgrade = async () => {
     try {
-      const result = await contractService.upgrade(upgradeBundleId, trackInvocation);
+      const result = await contractService.upgrade(upgradeBundleId, trackInvocationWithContext);
       
       if (result.success) {
-        setUpgradeBundleId(''); // Clear the form
+        setUpgradeBundleId('');
       }
       
       alert(result.message);
@@ -135,10 +257,10 @@ const Admin: React.FC<AdminProps> = ({
 
   const handleInstallAndStart = async () => {
     try {
-      const result = await contractService.installAndStart(installBundleId, trackInvocation);
+      const result = await contractService.installAndStart(installBundleId, trackInvocationWithContext);
       
       if (result.success) {
-        setInstallBundleId(''); // Clear the form
+        setInstallBundleId('');
       }
       
       alert(result.message);
@@ -149,7 +271,7 @@ const Admin: React.FC<AdminProps> = ({
 
   const handleGetCreatorFacet = async () => {
     try {
-      const result = await contractService.getCreatorFacet(creatorFacetName, trackInvocation);
+      const result = await contractService.getCreatorFacet(creatorFacetName, trackInvocationWithContext);
       
       alert(result.message);
     } catch (error) {
@@ -159,10 +281,10 @@ const Admin: React.FC<AdminProps> = ({
 
   const handleDeliverPlannerInvitation = async () => {
     try {
-      const result = await contractService.deliverPlannerInvitation(plannerAddress, trackInvocation);
+      const result = await contractService.deliverPlannerInvitation(plannerAddress, trackInvocationWithContext);
       
       if (result.success) {
-        setPlannerAddress(''); // Clear the form
+        setPlannerAddress('');
       }
       
       alert(result.message);
@@ -255,104 +377,18 @@ const Admin: React.FC<AdminProps> = ({
     };
   }, [ENDPOINTS]);
 
-  // Watch wallet state for invitations, track pending entries, and get saved entries
+  // Handle invocation completions
   useEffect(() => {
     if (!wallet || !watcherRef.current) return;
 
-    // Get invitations from purses (from app store, not wallet.purses)
-    const invitationPurse = purses?.find((p: any) => p.brandPetname === 'Invitation');
-    console.log('Admin: invitation purse:', invitationPurse);
-    if (invitationPurse?.currentAmount?.value && Array.isArray(invitationPurse.currentAmount.value)) {
-      // Show each invitation individually with just the description
-      const invitationList = invitationPurse.currentAmount.value.map((invitation: any, index: number) => {
-        const desc = invitation.description || 'unknown';
-        return [desc, index] as [string, number]; // Use index as identifier, description as display
-      });
-      setInvitations(invitationList);
-    }
-
-    // Watch wallet's current state for pending entries and saved entries
-    const walletPath = `published.wallet.${wallet.address}.current`;
-    console.log('Admin: Watching wallet state at', walletPath);
-    
-    watcherRef.current.watchLatest<any>(
-      [Kind.Data, walletPath],
-      (walletRecord) => {
-        console.log('Admin: Got wallet record', walletRecord);
-        
-        if (walletRecord?.liveOffers) {
-          const currentPending = new Set<string>();
-          
-          // Check live offers for saveResult entries (these are pending)
-          walletRecord.liveOffers.forEach(([offerId, offerSpec]: [string, any]) => {
-            if (offerSpec?.saveResult?.name) {
-              currentPending.add(offerSpec.saveResult.name);
-            }
-          });
-          
-          setPendingEntries(currentPending);
-        }
-
-        // Extract saved entries from wallet record
-        if (walletRecord) {
-          const currentSaved = new Set<string>();
-          
-          // Look for saved entries - these are top-level properties that aren't wallet internals
-          const walletInternalKeys = new Set([
-            'liveOffers', 
-            'offerToPublicSubscriberPaths', 
-            'offerToUsedInvitation',
-            'purses',
-            'offerToInvitationSpec'
-          ]);
-          
-          Object.keys(walletRecord).forEach(key => {
-            // Skip wallet internal properties
-            if (!walletInternalKeys.has(key) && 
-                typeof walletRecord[key] === 'object' && 
-                walletRecord[key] !== null) {
-              currentSaved.add(key);
-            }
-          });
-          
-          console.log('Admin: Found saved entries in wallet record:', Array.from(currentSaved));
-          setSavedEntries(currentSaved);
-        }
-      }
-    );
-
-    // Watch for invocation completions to remove from pending
     const walletUpdatesPath = `published.wallet.${wallet.address}`;
-    console.log('Admin: Setting up wallet updates watcher for path:', walletUpdatesPath);
-    
     watcherRef.current.watchLatest<any>(
       [Kind.Data, walletUpdatesPath],
       (walletData) => {
-        console.log('Admin: Got wallet updates data:', walletData);
-        
-        // Chain storage watcher provides deserialized data directly
-        console.log('Admin: Processing wallet update (deserialized)');
-        
-        if (walletData && typeof walletData === 'object' && walletData.updated === 'invocation' && walletData.id && (walletData.result !== undefined || walletData.error)) {
-          console.log('Admin: Found completed invocation:', walletData.id);
-          // Remove completed invocation from pending
-          setPendingInvocations(prev => {
-            const newSet = new Set(prev);
-            const wasRemoved = newSet.delete(walletData.id);
-            console.log('Admin: Removed invocation', walletData.id, 'from pending:', wasRemoved);
-            return newSet;
-          });
-          
-          // Add to wallet updates for real-time completion status
-          setWalletUpdates(prev => [...prev, walletData]);
-          
-          // Trigger transaction refetch when invocation completes
-          fetchTransactions();
-        }
+        handleInvocationCompletion(walletData, fetchTransactions);
       }
     );
-    
-  }, [wallet, purses, watcherRef.current]);
+  }, [wallet, watcherRef.current, handleInvocationCompletion, fetchTransactions]);
 
   // Extract saved entries from transaction history and merge with wallet state
   useEffect(() => {
@@ -377,36 +413,18 @@ const Admin: React.FC<AdminProps> = ({
     }
   }, [transactions]);
 
-  // Extract fetchTransactions function to be reusable
-  const fetchTransactions = async () => {
-    if (!wallet?.address) return;
-    
-    const url = `${ENDPOINTS.API}/cosmos/tx/v1beta1/txs?query=message.sender='${wallet.address}'&order_by=ORDER_BY_DESC&limit=${transactionLimit}`;
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setTransactions(data.tx_responses || []);
-    } catch (error) {
-      console.error('Could not fetch transactions:', error);
-    }
-  };
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [wallet?.address, ENDPOINTS, transactionLimit]);
+  // Render wallet connection prompt if no wallet
+  const renderWalletPrompt = () => (
+    <div>
+      <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
+      <p style={{ textAlign: 'left' }}>Please connect your wallet to continue.</p>
+      <button onClick={tryConnectWallet}>Connect Wallet</button>
+    </div>
+  );
 
-  // IMPORTANT: Keep this blank line before return - required for TSX export syntax
   if (!wallet) {
-    return (
-      <div>
-        <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
-        <p style={{ textAlign: 'left' }}>Please connect your wallet to continue.</p>
-        <button onClick={tryConnectWallet}>Connect Wallet</button>
-      </div>
-    );
+    return renderWalletPrompt();
   }
 
   return (
