@@ -418,22 +418,14 @@ const Admin: React.FC<AdminProps> = ({
     }
   }, [transactions]);
 
-  // Handle URL parameter for watch mode and set default addresses
+  // Handle URL parameter for watch mode only
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const watchParam = urlParams.get('watch');
     if (watchParam) {
       setWatchAddress(watchParam);
-    } else if (!wallet) {
-      // Set default watch address based on environment
-      const defaultAddresses = {
-        devnet: 'agoric10utru593dspjwfewcgdak8lvp9tkz0xttvcnxv',
-        mainnet: 'agoric1e80twfutmrm3wrk3fysjcnef4j82mq8dn6nmcq',
-        localhost: ''
-      };
-      setWatchAddress(defaultAddresses[environment] || '');
     }
-  }, [environment]);
+  }, []);
 
   const handleWatchAddress = () => {
     if (watchAddress.trim()) {
@@ -444,53 +436,7 @@ const Admin: React.FC<AdminProps> = ({
     }
   };
 
-  // Render wallet connection or watch address input
-  const renderConnectionSection = () => (
-    <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
-      <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>Connection</h2>
-      
-      {wallet ? (
-        <div style={{ color: 'green', fontWeight: 'bold' }}>
-          ✅ Connected: {wallet.address}
-        </div>
-      ) : watchAddress ? (
-        <div style={{ color: 'blue', fontWeight: 'bold' }}>
-          👁️ Watching: {watchAddress}
-        </div>
-      ) : null}
-      
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
-        <button onClick={tryConnectWallet} disabled={!!wallet}>
-          {wallet ? 'Wallet Connected' : 'Connect Wallet'}
-        </button>
-        
-        <span>or</span>
-        
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <input
-            type="text"
-            placeholder="Enter address to watch..."
-            value={watchAddress}
-            onChange={(e) => setWatchAddress(e.target.value)}
-            disabled={!!wallet}
-            style={{ 
-              padding: '0.5rem', 
-              border: '1px solid #ccc', 
-              borderRadius: '4px',
-              minWidth: '300px'
-            }}
-          />
-          <button 
-            onClick={handleWatchAddress}
-            disabled={!!wallet || !watchAddress.trim()}
-          >
-            Watch
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
+  // Show minimal interface until connected or watching
   if (!wallet && !watchAddress) {
     return (
       <div>
@@ -517,7 +463,21 @@ const Admin: React.FC<AdminProps> = ({
             </div>
           </div>
         </div>
-        {renderConnectionSection()}
+
+        <WalletEntriesCard
+          invitations={[]}
+          savedEntries={new Set()}
+          pendingEntries={new Set()}
+          onRedeemInvitation={() => {}}
+          walletAddress=""
+          readOnly={true}
+          wallet={wallet}
+          watchAddress={watchAddress}
+          setWatchAddress={setWatchAddress}
+          onWatchAddress={handleWatchAddress}
+          onConnectWallet={tryConnectWallet}
+          environment={environment}
+        />
       </div>
     );
   }
@@ -570,8 +530,6 @@ const Admin: React.FC<AdminProps> = ({
           </div>
         </div>
       </div>
-
-      {renderConnectionSection()}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <WalletEntriesCard

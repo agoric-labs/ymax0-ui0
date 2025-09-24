@@ -7,6 +7,13 @@ interface WalletEntriesCardProps {
   pendingEntries: Set<string>;
   onRedeemInvitation: (description: string, saveName: string, replace: boolean) => void;
   walletAddress: string;
+  readOnly?: boolean;
+  wallet?: any;
+  watchAddress?: string;
+  setWatchAddress?: (address: string) => void;
+  onWatchAddress?: () => void;
+  onConnectWallet?: () => void;
+  environment?: string;
 }
 
 const WalletEntriesCard: React.FC<WalletEntriesCardProps> = ({
@@ -15,7 +22,35 @@ const WalletEntriesCard: React.FC<WalletEntriesCardProps> = ({
   pendingEntries,
   onRedeemInvitation,
   walletAddress,
+  readOnly = false,
+  wallet,
+  watchAddress = '',
+  setWatchAddress,
+  onWatchAddress,
+  onConnectWallet,
+  environment = 'devnet',
 }) => {
+  const getDefaultAddress = () => {
+    const defaultAddresses = {
+      devnet: 'agoric10utru593dspjwfewcgdak8lvp9tkz0xttvcnxv',
+      mainnet: 'agoric1e80twfutmrm3wrk3fysjcnef4j82mq8dn6nmcq',
+      localhost: ''
+    };
+    return defaultAddresses[environment as keyof typeof defaultAddresses] || '';
+  };
+
+  const handleWatchWithDefault = () => {
+    if (!watchAddress.trim()) {
+      const defaultAddr = getDefaultAddress();
+      if (defaultAddr) {
+        setWatchAddress?.(defaultAddr);
+        // Trigger watch with default address
+        setTimeout(() => onWatchAddress?.(), 0);
+        return;
+      }
+    }
+    onWatchAddress?.();
+  };
   return (
     <div style={{ border: '2px solid #6f42c1', padding: '1rem', borderRadius: '8px', backgroundColor: '#f8f9ff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -50,6 +85,7 @@ const WalletEntriesCard: React.FC<WalletEntriesCardProps> = ({
                 index={index}
                 onRedeem={onRedeemInvitation}
                 isPending={pendingEntries.has(description)}
+                readOnly={readOnly}
               />
             ))}
           </div>
