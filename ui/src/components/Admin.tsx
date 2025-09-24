@@ -539,6 +539,12 @@ const Admin: React.FC<AdminProps> = ({
           onRedeemInvitation={handleRedeemInvitation}
           walletAddress={effectiveAddress}
           readOnly={!wallet}
+          wallet={wallet}
+          watchAddress={watchAddress}
+          setWatchAddress={setWatchAddress}
+          onWatchAddress={handleWatchAddress}
+          onConnectWallet={tryConnectWallet}
+          environment={environment}
         />
 
         <ContractControlCard
