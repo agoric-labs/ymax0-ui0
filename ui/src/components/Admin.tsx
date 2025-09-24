@@ -330,6 +330,16 @@ const Admin: React.FC<AdminProps> = ({
     setInstanceInfo(null);
     setInstanceBlockHeight(null);
 
+    // Update watch address to match new environment default if not connected to wallet
+    if (!wallet) {
+      const defaultAddresses = {
+        devnet: 'agoric10utru593dspjwfewcgdak8lvp9tkz0xttvcnxv',
+        mainnet: 'agoric1e80twfutmrm3wrk3fysjcnef4j82mq8dn6nmcq',
+        localhost: ''
+      };
+      setWatchAddress(defaultAddresses[newEnvironment] || '');
+    }
+
     // If wallet was connected, show refresh message
     if (wallet) {
       alert(
