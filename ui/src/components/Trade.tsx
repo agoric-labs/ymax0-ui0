@@ -226,6 +226,7 @@ const Trade = ({
                 <option value="Avalanche">Avalanche</option>
                 <option value="Arbitrum">Arbitrum</option>
                 <option value="Ethereum">Ethereum</option>
+                <option value="Base">Base</option>
               </select>
             </div>
           )}
@@ -417,6 +418,7 @@ const Trade = ({
                 <option value="Avalanche">Avalanche</option>
                 <option value="Arbitrum">Arbitrum</option>
                 <option value="Ethereum">Ethereum</option>
+                <option value="Base">Base</option>
               </select>
             </div>
           )}

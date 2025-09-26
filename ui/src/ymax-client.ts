@@ -4,7 +4,7 @@ import { objectMap } from '@endo/patterns';
 type NatAmount = { brand: Brand<'nat'>; value: bigint }; // XXX from ERTP
 
 export type YieldProtocol = 'USDN' | 'Aave' | 'Compound';
-export type EVMChain = 'Avalanche' | 'Arbitrum' | 'Ethereum'; // XXX etc.
+export type EVMChain = 'Avalanche' | 'Arbitrum' | 'Ethereum' | 'Base'; // XXX etc.
 
 const { entries, values } = Object;
 const { add, make } = AmountMath;
