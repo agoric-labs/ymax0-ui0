@@ -40,7 +40,6 @@ const Trade = ({
   acceptInvitation,
   settleTransaction,
   walletConnected,
-  offerId,
   usdcPurse,
   bldPurse,
   poc26Purse,

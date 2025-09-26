@@ -739,3 +739,257 @@ pre {
   margin-top: 0.25rem;
   margin-bottom: 0.5rem;
 }
+
+/* USDC Transfer Component Styles */
+.usdc-transfer-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+}
+
+.usdc-transfer-container .page-header {
+  text-align: center;
+  margin-bottom: var(--space-xl);
+}
+
+.usdc-transfer-container .page-header h1 {
+  color: var(--color-primary);
+  font-size: 2.5rem;
+  margin-bottom: var(--space-sm);
+}
+
+.usdc-transfer-container .page-header p {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+}
+
+.transfer-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.form-section {
+  margin-bottom: var(--space-xl);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.form-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.form-section h3 {
+  color: var(--color-primary);
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.chain-info {
+  background: var(--color-bg-secondary);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-sm);
+  border-left: 4px solid var(--color-primary);
+}
+
+.chain-info strong {
+  color: var(--color-text-primary);
+}
+
+.private-key-input, .address-input, .amount-input {
+  width: 100% !important;
+  max-width: 400px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: var(--font-size-sm);
+}
+
+.private-key-input {
+  background: #1a1a1a;
+  color: #fff;
+  border: 2px solid #444;
+}
+
+.private-key-input:focus {
+  border-color: var(--color-primary);
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.address-input {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.balance-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.check-balance-btn {
+  background: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-hover));
+  color: white;
+  border: none;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-sm);
+  align-self: flex-start;
+}
+
+.check-balance-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.check-balance-btn:disabled {
+  background: var(--color-text-muted);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.balance-display {
+  background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+  border: 2px solid #4caf50;
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.balance-display strong {
+  color: #2e7d32;
+  font-size: var(--font-size-lg);
+}
+
+.form-actions {
+  text-align: center;
+  margin-top: var(--space-xl);
+}
+
+.transfer-btn {
+  background: linear-gradient(135deg, var(--color-primary), #4c51bf);
+  color: white;
+  border: none;
+  padding: var(--space-md) var(--space-xl);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-md);
+  min-width: 180px;
+}
+
+.transfer-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  background: linear-gradient(135deg, #5a67d8, var(--color-primary));
+}
+
+.transfer-btn:disabled {
+  background: var(--color-text-muted);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--shadow-sm);
+  opacity: 0.6;
+}
+
+.error-message {
+  background: linear-gradient(135deg, #ffebee, #fce4ec);
+  border: 2px solid #f44336;
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-top: var(--space-lg);
+  color: #c62828;
+}
+
+.error-message strong {
+  color: #b71c1c;
+}
+
+.success-message {
+  background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
+  border: 2px solid #4caf50;
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-top: var(--space-lg);
+  color: #2e7d32;
+  word-break: break-all;
+}
+
+.success-message strong {
+  color: #1b5e20;
+}
+
+.tx-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  margin-left: var(--space-sm);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: var(--font-size-sm);
+}
+
+.tx-link:hover {
+  color: #5a67d8;
+}
+
+.security-warning {
+  background: linear-gradient(135deg, #fff3cd, #fefefe);
+  border: 2px solid #ffc107;
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-top: var(--space-xl);
+}
+
+.security-warning h4 {
+  color: #f57f17;
+  margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.security-warning p {
+  color: #8d6e00;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Responsive design for USDC transfer */
+@media (max-width: 768px) {
+  .usdc-transfer-container {
+    padding: var(--space-md);
+  }
+
+  .transfer-form {
+    padding: var(--space-lg);
+  }
+
+  .usdc-transfer-container .page-header h1 {
+    font-size: 2rem;
+  }
+
+  .private-key-input, .address-input, .amount-input {
+    max-width: 100%;
+  }
+
+  .balance-section {
+    align-items: stretch;
+  }
+
+  .check-balance-btn {
+    align-self: stretch;
+  }
+}

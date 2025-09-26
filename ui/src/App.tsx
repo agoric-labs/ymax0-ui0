@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 
 import './App.css';
 import {
@@ -15,6 +15,7 @@ import { subscribeLatest } from '@agoric/notifier';
 import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
+import { USDCTransfer } from './components/USDCTransfer';
 import Admin from './components/Admin.tsx';
 import { makePortfolioSteps } from './ymax-client.ts';
 import type {
@@ -596,6 +597,7 @@ const MainPage = () => {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
+  const location = useLocation();
   // Ref for chat iframe
   const chatIframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -688,6 +690,46 @@ const MainPage = () => {
       <div style={{ position: 'relative' }}>
         <Logos />
 
+        <nav style={{
+          padding: '10px 0',
+          marginBottom: '20px',
+          borderBottom: '1px solid #eee',
+          display: 'flex',
+          gap: '20px',
+          alignItems: 'center'
+        }}>
+          <Link
+            to="/"
+            style={{
+              textDecoration: location.pathname === '/' ? 'underline' : 'none',
+              fontWeight: location.pathname === '/' ? 'bold' : 'normal',
+              color: '#007bff'
+            }}
+          >
+            Portfolio
+          </Link>
+          <Link
+            to="/usdc-transfer"
+            style={{
+              textDecoration: location.pathname === '/usdc-transfer' ? 'underline' : 'none',
+              fontWeight: location.pathname === '/usdc-transfer' ? 'bold' : 'normal',
+              color: '#007bff'
+            }}
+          >
+            USDC Transfer
+          </Link>
+          <Link
+            to="/admin"
+            style={{
+              textDecoration: location.pathname === '/admin' ? 'underline' : 'none',
+              fontWeight: location.pathname === '/admin' ? 'bold' : 'normal',
+              color: '#007bff'
+            }}
+          >
+            Admin
+          </Link>
+        </nav>
+
         <div className="environment-selector">
           <label htmlFor="environment-select">Env: </label>
           <select
@@ -778,6 +820,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<MainPage />} />
+      <Route path="/usdc-transfer" element={<USDCTransfer />} />
       <Route
         path="/admin"
         element={
