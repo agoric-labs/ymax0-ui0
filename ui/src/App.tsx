@@ -16,13 +16,15 @@ import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
-import { makePortfolioSteps, MovementDesc } from './ymax-client.ts';
-import { getBrand } from './utils';
+import { makePortfolioSteps } from './ymax-client.ts';
 import type {
   Environment,
   AppState,
   YieldProtocol,
+  EVMChain,
+  MovementDesc,
 } from './types';
+import { getBrand } from './utils';
 import { getInitialEnvironment, configureEndpoints } from './config';
 
 const { fromEntries } = Object;
@@ -30,7 +32,7 @@ const { fromEntries } = Object;
 let ENDPOINTS = configureEndpoints(getInitialEnvironment(), true);
 let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
-const useAppStore = create<AppState>(() => ({}));
+const useAppStore = create<AppState>(() => ({} as AppState));
 
 const setup = async () => {
   watcher.watchLatest<Array<[string, unknown]>>(
@@ -225,8 +227,7 @@ const withdrawUSDC = () => {
       source: 'continuing',
       previousOffer: offerId,
       instance: offerUpInstance,
-      invitationMakerName: 'makeWithdrawInvitation',
-      publicInvitationMaker: 'makeWithdrawInvitation',
+      publicInvitationMaker: 'Rebalance',
       description: 'Withdraw USDC',
       fee: {
         gas: 400000,
@@ -250,6 +251,117 @@ const withdrawUSDC = () => {
       if (update.status === 'refunded') {
         console.log('Withdraw rejected:', update.data);
         alert(`Withdraw rejected: ${offerDetails}`);
+      }
+    },
+  );
+};
+
+const withdrawFromProtocol = (
+  withdrawAmount: bigint,
+  fromProtocol: YieldProtocol,
+  evmChain?: EVMChain,
+  prevOfferId?: string,
+) => {
+  const { wallet, offerUpInstance, purses } = useAppStore.getState();
+  if (!offerUpInstance) {
+    alert('No contract instance found on the chain RPC: ' + ENDPOINTS.RPC);
+    throw Error('no contract instance');
+  }
+
+  const offerId = prevOfferId || 'open-2025-09-19T09:25:20.918Z';
+
+  if (!offerId) {
+    alert('No previous offer ID found. Please make an initial offer first.');
+    return;
+  }
+
+  const usdcBrand = getBrand(purses, 'usdc');
+  if (!usdcBrand) {
+    alert('Required brand (USDC) is not available in purses.');
+    return;
+  }
+
+  const bldBrand = getBrand(purses, 'bld');
+  if (!bldBrand) {
+    alert('Required brand (BLD) is not available in purses.');
+    return;
+  }
+
+  const proposal = {
+    want: { Cash: { brand: usdcBrand as Brand<'nat'>, value: withdrawAmount } },
+  };
+
+  console.log('Making continuing offer to withdraw from protocol with:', {
+    previousOffer: offerId,
+    instance: offerUpInstance,
+    proposal,
+    fromProtocol,
+    evmChain,
+  });
+
+  const amount = proposal.want.Cash;
+  const steps: MovementDesc[] = [];
+
+  // Default fee amount (2 BLD = 2,000,000 micro-BLD)
+  const defaultFee = { brand: bldBrand as Brand<'nat'>, value: 15_000_000n };
+
+  // Create withdrawal steps based on protocol
+  switch (fromProtocol) {
+    case 'USDN':
+      steps.push(
+        { src: 'USDNVault', dest: '@noble', amount },
+        { src: '@noble', dest: '@agoric', amount },
+        { src: '@agoric', dest: '<Cash>', amount },
+      );
+      break;
+    case 'Aave':
+    case 'Compound':
+      const chain = evmChain || 'Avalanche';
+      steps.push(
+        {
+          src: `${fromProtocol}_${chain}`,
+          dest: `@${chain}`,
+          amount,
+          fee: defaultFee,
+        },
+        { src: `@${chain}`, dest: '@noble', amount, fee: defaultFee },
+        { src: '@noble', dest: '@agoric', amount },
+        { src: '@agoric', dest: '<Cash>', amount },
+      );
+      break;
+    default:
+      alert(`Unsupported protocol: ${fromProtocol}`);
+      return;
+  }
+
+  wallet?.makeOffer(
+    {
+      source: 'continuing',
+      previousOffer: offerId,
+      instance: offerUpInstance,
+      invitationMakerName: 'Rebalance',
+      description: `Withdraw from ${fromProtocol}${evmChain ? ` on ${evmChain}` : ''}`,
+    },
+    proposal,
+    { flow: steps },
+    (update: { status: string; data?: unknown }) => {
+      console.log('Protocol withdraw offer update:', update);
+
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
+      const offerDetails = JSON.stringify(update, bigintReplacer, 2);
+
+      if (update.status === 'error') {
+        console.error('Protocol withdraw error:', update.data);
+        alert(`Protocol withdraw error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log('Protocol withdraw accepted:', update.data);
+        alert(`Protocol withdraw accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log('Protocol withdraw rejected:', update.data);
+        alert(`Protocol withdraw rejected: ${offerDetails}`);
       }
     },
   );
@@ -307,6 +419,131 @@ const openEmptyPortfolio = () => {
       }
     },
     offerId, // Pass the offerId for future reference
+  );
+};
+
+const acceptInvitation = () => {
+  const { wallet, purses } = useAppStore.getState();
+
+  if (!wallet) {
+    alert('Wallet not connected');
+    return;
+  }
+
+  if (!purses || purses.length === 0) {
+    alert('No purses available');
+    return;
+  }
+
+  const invitationPurse = purses.find(
+    (purse: Purse) => purse.brandPetname === 'Invitation',
+  );
+
+  const firstPurseBalance = invitationPurse?.currentAmount.value;
+  // Get the first purse instance as specified in the template
+
+  if (
+    !firstPurseBalance ||
+    typeof firstPurseBalance === 'bigint' ||
+    !Array.isArray(firstPurseBalance)
+  ) {
+    alert('Invalid invitation purse balance format');
+    return;
+  }
+
+  const offer = {
+    id: Date.now(),
+    invitationSpec: {
+      source: 'purse',
+      instance: firstPurseBalance[0].instance,
+      description: 'resolver',
+    },
+    proposal: { give: {}, want: {} },
+  };
+
+  console.log('Accepting invitation with offer:', offer);
+
+  wallet.makeOffer(
+    offer.invitationSpec,
+    offer.proposal,
+    {},
+    (update: { status: string; data?: unknown }) => {
+      console.log('Accept invitation offer update:', update);
+
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
+      const offerDetails = JSON.stringify(update, bigintReplacer, 2);
+
+      if (update.status === 'error') {
+        console.error('Accept invitation offer error:', update.data);
+        alert(`Accept invitation offer error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log('Accept invitation offer accepted:', update.data);
+        alert(`Accept invitation offer accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log('Accept invitation offer refunded:', update.data);
+        alert(`Accept invitation offer refunded: ${offerDetails}`);
+      }
+    },
+    offer.id,
+  );
+};
+
+const settleTransaction = (
+  txId: string,
+  status: string,
+  prevOfferId: string,
+) => {
+  const { wallet } = useAppStore.getState();
+
+  if (!wallet) {
+    alert('Wallet not connected');
+    return;
+  }
+
+  const offer = {
+    id: Date.now(),
+    invitationSpec: {
+      source: 'continuing',
+      previousOffer: prevOfferId,
+      invitationMakerName: 'SettleTransaction',
+    },
+    proposal: { give: {}, want: {} },
+    offerArgs: {
+      txId,
+      status,
+    },
+  };
+
+  console.log('Settling transaction with offer:', offer);
+
+  wallet.makeOffer(
+    offer.invitationSpec,
+    offer.proposal,
+    offer.offerArgs,
+    (update: { status: string; data?: unknown }) => {
+      console.log('Settle transaction offer update:', update);
+
+      const bigintReplacer = (_k: string, v: any) =>
+        typeof v === 'bigint' ? `${v}` : v;
+      const offerDetails = JSON.stringify(update, bigintReplacer, 2);
+
+      if (update.status === 'error') {
+        console.error('Settle transaction offer error:', update.data);
+        alert(`Settle transaction offer error: ${offerDetails}`);
+      }
+      if (update.status === 'accepted') {
+        console.log('Settle transaction offer accepted:', update.data);
+        alert(`Settle transaction offer accepted: ${offerDetails}`);
+      }
+      if (update.status === 'refunded') {
+        console.log('Settle transaction offer refunded:', update.data);
+        alert(`Settle transaction offer refunded: ${offerDetails}`);
+      }
+    },
+    offer.id,
   );
 };
 
@@ -417,17 +654,17 @@ const MainPage = () => {
   }, []);
 
   const { wallet, purses, offerId } = useAppStore(
-    ({ wallet, purses, offerId }) => ({
-      wallet,
-      purses,
-      offerId,
+    (state: AppState) => ({
+      wallet: state.wallet,
+      purses: state.purses,
+      offerId: state.offerId,
     }),
   );
-  const istPurse = purses?.find(p => p.brandPetname === 'IST');
-  const itemsPurse = purses?.find(p => p.brandPetname === 'Items');
-  const usdcPurse = purses?.find(p => p.brandPetname === 'USDC');
-  const bldPurse = purses?.find(p => p.brandPetname === 'BLD');
-  const poc26Purse = purses?.find(p => p.brandPetname === 'PoC26');
+  const istPurse = purses?.find((p: Purse) => p.brandPetname === 'IST');
+  const itemsPurse = purses?.find((p: Purse) => p.brandPetname === 'Items');
+  const usdcPurse = purses?.find((p: Purse) => p.brandPetname === 'USDC');
+  const bldPurse = purses?.find((p: Purse) => p.brandPetname === 'BLD');
+  const poc26Purse = purses?.find((p: Purse) => p.brandPetname === 'PoC26');
 
   const handleEnvironmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newEnvironment = e.target.value as Environment;
@@ -481,7 +718,10 @@ const MainPage = () => {
                 makeOffer(usdcAmount, bldFeeAmount, yProtocol)
               }
               withdrawUSDC={withdrawUSDC}
+              withdrawFromProtocol={withdrawFromProtocol}
               openEmptyPortfolio={openEmptyPortfolio}
+              acceptInvitation={acceptInvitation}
+              settleTransaction={settleTransaction}
               istPurse={istPurse as Purse}
               walletConnected={!!wallet}
               offerId={offerId}
@@ -527,11 +767,13 @@ function App() {
     setup();
   }, []);
 
-  const { wallet, instances, purses } = useAppStore(({ wallet, instances, purses }) => ({
-    wallet,
-    instances,
-    purses,
-  }));
+  const { wallet, instances, purses } = useAppStore(
+    (state: AppState) => ({
+      wallet: state.wallet,
+      instances: state.instances,
+      purses: state.purses,
+    }),
+  );
 
   return (
     <Routes>
