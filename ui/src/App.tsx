@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 import './App.css';
@@ -17,6 +17,7 @@ import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
 import { makePortfolioSteps } from './ymax-client.ts';
+import { StepInfo } from './components/StepSelector';
 import type {
   Environment,
   AppState,
@@ -24,6 +25,7 @@ import type {
   EVMChain,
   MovementDesc,
 } from './types';
+import type { Brand } from '@agoric/ertp/src/types.js';
 import { getBrand } from './utils';
 import { getInitialEnvironment, configureEndpoints } from './config';
 
@@ -32,7 +34,7 @@ const { fromEntries } = Object;
 let ENDPOINTS = configureEndpoints(getInitialEnvironment(), true);
 let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
-const useAppStore = create<AppState>(() => ({} as AppState));
+const useAppStore = create<AppState>(() => ({}) as AppState);
 
 const setup = async () => {
   watcher.watchLatest<Array<[string, unknown]>>(
@@ -92,6 +94,9 @@ const makeOffer = (
   usdcAmount: bigint = 1_250_000n,
   bldFeeAmount: bigint = 20_000_000n,
   yProtocol: YieldProtocol = 'Aave',
+  evmChain: EVMChain = 'Avalanche',
+  selectedSteps?: string[],
+  customSteps?: StepInfo[],
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -127,13 +132,68 @@ const makeOffer = (
     value: giveValue,
   };
 
-  const { give, steps } = makePortfolioSteps(position, {
-    evm: 'Avalanche',
+  const { give, steps: allSteps } = makePortfolioSteps(position, {
+    evm: evmChain,
     feeBrand: BLDBrand as Brand<'nat'>,
     feeBasisPoints: bldFeeAmount,
     detail:
       yProtocol === 'USDN' ? { usdnOut: (giveValue * 99n) / 100n } : undefined,
   });
+
+  // Convert custom steps to MovementDesc format and add selected ones
+  const customMovements: MovementDesc[] = [];
+  if (customSteps && selectedSteps) {
+    customSteps.forEach(customStep => {
+      if (selectedSteps.includes(customStep.id) && customStep.movement) {
+        // Convert StepInfo movement to proper MovementDesc with correct brands
+        const movement: MovementDesc = {
+          src: customStep.movement.src,
+          dest: customStep.movement.dest,
+          amount: {
+            brand: usdcBrand as Brand<'nat'>,
+            value: customStep.movement.amount.value,
+          },
+          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
+            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+            value: 40n 
+          } : undefined),
+          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+        };
+        customMovements.push(movement);
+      }
+    });
+  }
+
+  // Filter steps based on selection if provided
+  const baseSteps =
+    selectedSteps && selectedSteps.length > 0
+      ? allSteps.filter(step => {
+          return selectedSteps.some(id => {
+            switch (id) {
+              case 'access-token':
+                return true; // Always include access token
+              case 'deposit-to-agoric':
+                return step.src === '<Deposit>' && step.dest === '@agoric';
+              case 'agoric-to-noble':
+                return step.src === '@agoric' && step.dest === '@noble';
+              case 'noble-to-usdn':
+                return step.src === '@noble' && step.dest === 'USDNVault';
+              case 'noble-to-evm':
+                return step.src === '@noble' && step.dest === `@${evmChain}`;
+              case `evm-to-${yProtocol.toLowerCase()}`:
+                return (
+                  step.src === `@${evmChain}` &&
+                  step.dest === `${yProtocol}_${evmChain}`
+                );
+              default:
+                return false;
+            }
+          });
+        })
+      : allSteps;
+
+  // Combine base steps with custom steps
+  const steps = [...baseSteps, ...customMovements];
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
@@ -218,9 +278,36 @@ const withdrawUSDC = () => {
   const { yProtocol = 'USDN' } = useAppStore.getState();
 
   const steps: MovementDesc[] = [
-    { src: yProtocol, dest: '@noble', amount },
-    { src: '@noble', dest: '@agoric', amount },
-    { src: '@agoric', dest: '<Cash>', amount },
+    { 
+      src: yProtocol, 
+      dest: '@noble', 
+      amount,
+      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
+        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+        value: 0n 
+      } : undefined,
+      detail: {}
+    },
+    { 
+      src: '@noble', 
+      dest: '@agoric', 
+      amount,
+      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
+        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+        value: 0n 
+      } : undefined,
+      detail: {}
+    },
+    { 
+      src: '@agoric', 
+      dest: '<Cash>', 
+      amount,
+      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
+        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+        value: 0n 
+      } : undefined,
+      detail: {}
+    },
   ];
   wallet?.makeOffer(
     {
@@ -261,6 +348,8 @@ const withdrawFromProtocol = (
   fromProtocol: YieldProtocol,
   evmChain?: EVMChain,
   prevOfferId?: string,
+  selectedSteps?: string[],
+  customSteps?: StepInfo[],
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -300,7 +389,7 @@ const withdrawFromProtocol = (
   });
 
   const amount = proposal.want.Cash;
-  const steps: MovementDesc[] = [];
+  const allSteps: MovementDesc[] = [];
 
   // Default fee amount (2 BLD = 2,000,000 micro-BLD)
   const defaultFee = { brand: bldBrand as Brand<'nat'>, value: 15_000_000n };
@@ -308,7 +397,7 @@ const withdrawFromProtocol = (
   // Create withdrawal steps based on protocol
   switch (fromProtocol) {
     case 'USDN':
-      steps.push(
+      allSteps.push(
         { src: 'USDNVault', dest: '@noble', amount },
         { src: '@noble', dest: '@agoric', amount },
         { src: '@agoric', dest: '<Cash>', amount },
@@ -317,7 +406,7 @@ const withdrawFromProtocol = (
     case 'Aave':
     case 'Compound':
       const chain = evmChain || 'Avalanche';
-      steps.push(
+      allSteps.push(
         {
           src: `${fromProtocol}_${chain}`,
           dest: `@${chain}`,
@@ -333,6 +422,62 @@ const withdrawFromProtocol = (
       alert(`Unsupported protocol: ${fromProtocol}`);
       return;
   }
+
+  // Convert custom steps to MovementDesc format and add selected ones
+  const customMovements: MovementDesc[] = [];
+  if (customSteps && selectedSteps) {
+    customSteps.forEach(customStep => {
+      if (selectedSteps.includes(customStep.id) && customStep.movement) {
+        // Convert StepInfo movement to proper MovementDesc with correct brands
+        const movement: MovementDesc = {
+          src: customStep.movement.src,
+          dest: customStep.movement.dest,
+          amount: {
+            brand: usdcBrand as Brand<'nat'>,
+            value: customStep.movement.amount.value,
+          },
+          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
+            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+            value: 40n 
+          } : undefined),
+          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+        };
+        customMovements.push(movement);
+      }
+    });
+  }
+
+  // Filter steps based on selection if provided
+  const baseSteps =
+    selectedSteps && selectedSteps.length > 0
+      ? allSteps.filter(step => {
+          return selectedSteps.some(id => {
+            switch (id) {
+              case 'usdn-to-noble':
+                return step.src === 'USDNVault' && step.dest === '@noble';
+              case `${fromProtocol.toLowerCase()}-to-evm`:
+                return (
+                  step.src === `${fromProtocol}_${evmChain || 'Avalanche'}` &&
+                  step.dest === `@${evmChain || 'Avalanche'}`
+                );
+              case 'evm-to-noble':
+                return (
+                  step.src === `@${evmChain || 'Avalanche'}` &&
+                  step.dest === '@noble'
+                );
+              case 'noble-to-agoric':
+                return step.src === '@noble' && step.dest === '@agoric';
+              case 'receive-cash':
+                return step.src === '@agoric' && step.dest === '<Cash>';
+              default:
+                return false;
+            }
+          });
+        })
+      : allSteps;
+
+  // Combine base steps with custom steps
+  const steps = [...baseSteps, ...customMovements];
 
   wallet?.makeOffer(
     {
@@ -596,70 +741,12 @@ const MainPage = () => {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
-  // Ref for chat iframe
-  const chatIframeRef = useRef<HTMLIFrameElement>(null);
 
-  useEffect(() => {
-    // Prevent iframe scrolling from affecting parent page
-    const handleIframeLoad = () => {
-      if (chatIframeRef.current) {
-        try {
-          // Try to access iframe content if same origin allows it
-          const iframeWindow = chatIframeRef.current.contentWindow;
-          if (iframeWindow) {
-            iframeWindow.addEventListener('scroll', e => {
-              e.stopPropagation();
-            });
-
-            // Attempt to add scroll containment to iframe document if possible
-            iframeWindow.document.body.style.overflow = 'auto';
-            iframeWindow.document.body.style.overscrollBehavior = 'contain';
-          }
-        } catch (e) {
-          // Cross-origin restrictions will likely prevent access
-          console.log(
-            'Cannot access iframe content due to cross-origin policy',
-          );
-        }
-      }
-    };
-
-    // Prevent wheel events from propagating outside the chat sidebar
-    const chatSidebar = document.querySelector('.chat-sidebar');
-    const preventPropagation = (e: Event) => {
-      e.stopPropagation();
-    };
-
-    if (chatSidebar) {
-      chatSidebar.addEventListener('wheel', preventPropagation);
-      chatSidebar.addEventListener('touchmove', preventPropagation);
-    }
-
-    // Add load event listener to iframe if available
-    if (chatIframeRef.current) {
-      chatIframeRef.current.addEventListener('load', handleIframeLoad);
-    }
-
-    return () => {
-      // Clean up event listeners
-      if (chatIframeRef.current) {
-        chatIframeRef.current.removeEventListener('load', handleIframeLoad);
-      }
-
-      if (chatSidebar) {
-        chatSidebar.removeEventListener('wheel', preventPropagation);
-        chatSidebar.removeEventListener('touchmove', preventPropagation);
-      }
-    };
-  }, []);
-
-  const { wallet, purses, offerId } = useAppStore(
-    (state: AppState) => ({
-      wallet: state.wallet,
-      purses: state.purses,
-      offerId: state.offerId,
-    }),
-  );
+  const { wallet, purses, offerId } = useAppStore((state: AppState) => ({
+    wallet: state.wallet,
+    purses: state.purses,
+    offerId: state.offerId,
+  }));
   const istPurse = purses?.find((p: Purse) => p.brandPetname === 'IST');
   const itemsPurse = purses?.find((p: Purse) => p.brandPetname === 'Items');
   const usdcPurse = purses?.find((p: Purse) => p.brandPetname === 'USDC');
@@ -685,26 +772,42 @@ const MainPage = () => {
 
   return (
     <>
-      <div style={{ position: 'relative' }}>
+      {/* Top header with logo and wallet status */}
+      <div className="top-header">
         <Logos />
+        <div className="wallet-header-inline">
+          <div className="wallet-status">
+            {wallet && wallet.address ? (
+              <div className="wallet-connected">
+                <div className="wallet-info">
+                  <span className="wallet-address">{wallet.address}</span>
+                </div>
+                <div className="connection-status">
+                  <span className="status-indicator connected"></span>
+                  <span className="status-text">Connected</span>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={tryConnectWallet}
+                className="connect-wallet-button"
+              >
+                Connect Wallet
+              </button>
+            )}
+          </div>
 
-        <div className="environment-selector">
-          <label htmlFor="environment-select">Env: </label>
-          <select
-            id="environment-select"
-            value={environment}
-            onChange={handleEnvironmentChange}
-          >
-            <option value="mainnet">Mainnet</option>
-            <option value="devnet">Devnet</option>
-            <option value="localhost">Localhost</option>
-          </select>
-          <div className="environment-info">
-            <small>
-              RPC: {ENDPOINTS.RPC}
-              <br />
-              API: {ENDPOINTS.API}
-            </small>
+          <div className="environment-selector-header">
+            <select
+              id="env-select"
+              value={environment}
+              onChange={handleEnvironmentChange}
+              className="env-selector"
+            >
+              <option value="mainnet">Mainnet</option>
+              <option value="devnet">Devnet</option>
+              <option value="localhost">Localhost</option>
+            </select>
           </div>
         </div>
       </div>
@@ -712,10 +815,21 @@ const MainPage = () => {
       <div className="app-container">
         <div className="main-content">
           <div className="card">
-            {' '}
             <Trade
-              makeOffer={(usdcAmount, bldFeeAmount, yProtocol) =>
-                makeOffer(usdcAmount, bldFeeAmount, yProtocol)
+              makeOffer={(
+                usdcAmount,
+                bldFeeAmount,
+                yProtocol,
+                evmChain,
+                selectedSteps,
+              ) =>
+                makeOffer(
+                  usdcAmount,
+                  bldFeeAmount,
+                  yProtocol,
+                  evmChain,
+                  selectedSteps,
+                )
               }
               withdrawUSDC={withdrawUSDC}
               withdrawFromProtocol={withdrawFromProtocol}
@@ -728,33 +842,22 @@ const MainPage = () => {
               usdcPurse={usdcPurse as Purse}
               bldPurse={bldPurse as Purse}
               poc26Purse={poc26Purse as Purse}
+              walletAddress={wallet?.address}
+              watcher={watcher}
             />
-            <hr />
-            {wallet && istPurse ? (
-              <Inventory
-                address={wallet.address}
-                istPurse={istPurse}
-                itemsPurse={itemsPurse as Purse}
-                usdcPurse={usdcPurse as Purse}
-                bldPurse={bldPurse as Purse}
-                poc26Purse={poc26Purse as Purse}
-              />
-            ) : (
-              <button onClick={tryConnectWallet}>Connect Wallet</button>
+            {wallet && istPurse && (
+              <>
+                <hr />
+                <Inventory
+                  address={wallet.address}
+                  istPurse={istPurse}
+                  itemsPurse={itemsPurse as Purse}
+                  usdcPurse={usdcPurse as Purse}
+                  bldPurse={bldPurse as Purse}
+                  poc26Purse={poc26Purse as Purse}
+                />
+              </>
             )}
-          </div>
-        </div>
-
-        <div className="chat-sidebar">
-          <h3>Agoric Community Chat</h3>
-          <div className="iframe-container">
-            <iframe
-              ref={chatIframeRef}
-              src="https://chat.agoric.net/"
-              title="Agoric Community Chat"
-              className="chat-iframe"
-              sandbox="allow-scripts allow-same-origin allow-forms"
-            ></iframe>
           </div>
         </div>
       </div>
@@ -767,13 +870,11 @@ function App() {
     setup();
   }, []);
 
-  const { wallet, instances, purses } = useAppStore(
-    (state: AppState) => ({
-      wallet: state.wallet,
-      instances: state.instances,
-      purses: state.purses,
-    }),
-  );
+  const { wallet, instances, purses } = useAppStore((state: AppState) => ({
+    wallet: state.wallet,
+    instances: state.instances,
+    purses: state.purses,
+  }));
 
   return (
     <Routes>
