@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ContractControlCardProps {
-  instanceInfo: { ymax0?: string; postalService?: string } | null;
+  instanceInfo: { ymax1?: string; postalService?: string } | null;
   instanceBlockHeight: string | null;
   creatorFacetName: string;
   setCreatorFacetName: (value: string) => void;
@@ -36,18 +36,34 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
   onInstallAndStart,
 }) => {
   return (
-    <div style={{ border: '2px solid #007bff', padding: '1rem', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
-      <h3 style={{ color: '#007bff', marginTop: 0, textAlign: 'left' }}>YMax Contract Control</h3>
-      
+    <div
+      style={{
+        border: '2px solid #007bff',
+        padding: '1rem',
+        borderRadius: '8px',
+        backgroundColor: '#f8f9fa',
+      }}
+    >
+      <h3 style={{ color: '#007bff', marginTop: 0, textAlign: 'left' }}>
+        YMax Contract Control
+      </h3>
+
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
         {/* Left: Instance Info */}
         <div style={{ flex: '0 0 300px' }}>
-          {instanceInfo?.ymax0 && (
+          {instanceInfo?.ymax1 && (
             <div style={{ marginBottom: '0.5rem' }}>
-              <strong>Instance:</strong> {instanceInfo.ymax0}{' '}
+              <strong>Instance:</strong> {instanceInfo.ymax1}{' '}
               <button
-                onClick={() => navigator.clipboard.writeText(instanceInfo.ymax0!)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}
+                onClick={() =>
+                  navigator.clipboard.writeText(instanceInfo.ymax1!)
+                }
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0',
+                }}
                 title="Copy instance"
               >
                 📋
@@ -62,24 +78,33 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
         </div>
 
         {/* Right: Actions */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+          }}
+        >
           {/* Get Creator Facet */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>Get Facet:</label>
+            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>
+              Get Facet:
+            </label>
             <input
               type="text"
               value={creatorFacetName}
-              onChange={(e) => setCreatorFacetName(e.target.value)}
+              onChange={e => setCreatorFacetName(e.target.value)}
               placeholder="creatorFacet"
-              style={{ 
+              style={{
                 flex: 1,
-                padding: '0.4rem', 
+                padding: '0.4rem',
                 border: '1px solid #ccc',
                 borderRadius: '4px',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             />
-            <button 
+            <button
               onClick={onGetCreatorFacet}
               style={{
                 padding: '0.4rem 0.8rem',
@@ -88,7 +113,7 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             >
               Get Creator Facet
@@ -97,21 +122,23 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
 
           {/* Terminate */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>Terminate:</label>
+            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>
+              Terminate:
+            </label>
             <input
               type="text"
               value={terminateMessage}
-              onChange={(e) => setTerminateMessage(e.target.value)}
+              onChange={e => setTerminateMessage(e.target.value)}
               placeholder="Optional message"
-              style={{ 
+              style={{
                 flex: 1,
-                padding: '0.4rem', 
+                padding: '0.4rem',
                 border: '1px solid #ccc',
                 borderRadius: '4px',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             />
-            <button 
+            <button
               onClick={onTerminate}
               style={{
                 padding: '0.4rem 0.8rem',
@@ -120,7 +147,7 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             >
               Terminate
@@ -129,21 +156,23 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
 
           {/* Upgrade */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>Upgrade:</label>
+            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>
+              Upgrade:
+            </label>
             <input
               type="text"
               value={upgradeBundleId}
-              onChange={(e) => setUpgradeBundleId(e.target.value)}
+              onChange={e => setUpgradeBundleId(e.target.value)}
               placeholder="Bundle ID"
-              style={{ 
+              style={{
                 flex: 1,
-                padding: '0.4rem', 
+                padding: '0.4rem',
                 border: '1px solid #ccc',
                 borderRadius: '4px',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             />
-            <button 
+            <button
               onClick={onUpgrade}
               style={{
                 padding: '0.4rem 0.8rem',
@@ -152,7 +181,7 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             >
               Upgrade
@@ -161,21 +190,23 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
 
           {/* Install and Start */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>Install:</label>
+            <label style={{ minWidth: '80px', fontWeight: 'bold' }}>
+              Install:
+            </label>
             <input
               type="text"
               value={installBundleId}
-              onChange={(e) => setInstallBundleId(e.target.value)}
+              onChange={e => setInstallBundleId(e.target.value)}
               placeholder="Bundle ID"
-              style={{ 
+              style={{
                 flex: 1,
-                padding: '0.4rem', 
+                padding: '0.4rem',
                 border: '1px solid #ccc',
                 borderRadius: '4px',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             />
-            <button 
+            <button
               onClick={onInstallAndStart}
               style={{
                 padding: '0.4rem 0.8rem',
@@ -184,7 +215,7 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '0.9em'
+                fontSize: '0.9em',
               }}
             >
               Install & Start
