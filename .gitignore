@@ -41,3 +41,6 @@ videos
 contract/,tx.json
 contract/start-offer-up-plan.json
 .aider*
+
+# Local Netlify folder
+.netlify

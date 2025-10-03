@@ -1,6 +1,9 @@
 import { stringifyAmountValue } from '@agoric/ui-components';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { YieldProtocol, EVMChain } from '../ymax-client';
+import { StepSelector, StepInfo } from './StepSelector';
+import { generateOpenPositionSteps, generateWithdrawSteps } from '../utils/stepUtils';
+import { getLatestOpenPortfolioOfferId, testVstoragePath } from '../utils/walletUtils';
 
 type TradeProps = {
   makeOffer: (
@@ -8,6 +11,7 @@ type TradeProps = {
     bldFeeAmount: bigint,
     yieldProtocol: YieldProtocol,
     evmChain?: EVMChain,
+    selectedSteps?: string[],
   ) => void;
   withdrawUSDC: () => void;
   withdrawFromProtocol: (
@@ -15,6 +19,7 @@ type TradeProps = {
     fromProtocol: YieldProtocol,
     evmChain?: EVMChain,
     prevOfferId?: string,
+    selectedSteps?: string[],
   ) => void;
   openEmptyPortfolio: () => void;
   acceptInvitation: () => void;
@@ -29,6 +34,8 @@ type TradeProps = {
   usdcPurse?: Purse;
   bldPurse?: Purse;
   poc26Purse?: Purse;
+  walletAddress?: string;
+  watcher?: any;
 };
 
 // Simplified Trade component with customizable USDC and BLD fee amounts
@@ -44,6 +51,8 @@ const Trade = ({
   usdcPurse,
   bldPurse,
   poc26Purse,
+  walletAddress,
+  watcher,
 }: TradeProps) => {
   // Default to 1.25 USDC and 20 BLD
   const [usdcAmount, setUsdcAmount] = useState<string>('1.25');
@@ -68,6 +77,61 @@ const Trade = ({
     'open-2025-09-19T09:25:20.918Z',
   );
 
+  // Step selection state
+  const [openPositionSelectedSteps, setOpenPositionSelectedSteps] = useState<string[]>([]);
+  const [withdrawSelectedSteps, setWithdrawSelectedSteps] = useState<string[]>([]);
+
+  // Auto-fetched offer ID state
+  const [isLoadingOfferId, setIsLoadingOfferId] = useState(false);
+  const [autoFetchedOfferId, setAutoFetchedOfferId] = useState<string | null>(null);
+
+  // Fetch latest offer ID when wallet is connected
+  useEffect(() => {
+    const fetchLatestOfferId = async () => {
+      if (walletConnected && walletAddress && watcher && !isLoadingOfferId) {
+        setIsLoadingOfferId(true);
+        try {
+          console.log('Fetching latest offer ID for wallet:', walletAddress);
+          const latestOfferId = await getLatestOpenPortfolioOfferId(watcher, walletAddress);
+          console.log('Fetched offer ID:', latestOfferId);
+          if (latestOfferId) {
+            setAutoFetchedOfferId(latestOfferId);
+            setWithdrawPrevOfferId(latestOfferId);
+          } else {
+            console.log('No openPortfolio offers found for this wallet');
+          }
+        } catch (error) {
+          console.error('Failed to fetch latest offer ID:', error);
+        } finally {
+          setIsLoadingOfferId(false);
+        }
+      }
+    };
+
+    // Add a small delay to ensure wallet connection is fully established
+    const timeoutId = setTimeout(fetchLatestOfferId, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [walletConnected, walletAddress, watcher, isLoadingOfferId]);
+
+  // Manual refresh function
+  const handleRefreshOfferId = async () => {
+    if (walletConnected && walletAddress && watcher && !isLoadingOfferId) {
+      setIsLoadingOfferId(true);
+      try {
+        const latestOfferId = await getLatestOpenPortfolioOfferId(watcher, walletAddress);
+        if (latestOfferId) {
+          setAutoFetchedOfferId(latestOfferId);
+          setWithdrawPrevOfferId(latestOfferId);
+        }
+      } catch (error) {
+        console.error('Failed to refresh offer ID:', error);
+        alert('Failed to fetch latest offer ID. Please check console for details.');
+      } finally {
+        setIsLoadingOfferId(false);
+      }
+    }
+  };
+
   // Handle making an offer
   const handleMakeOffer = () => {
     // Convert USDC amount to bigint (USDC has 6 decimal places)
@@ -88,7 +152,7 @@ const Trade = ({
         ? evmChain
         : undefined;
 
-    makeOffer(usdcValue, bldValue, yieldProtocol, evmChainParam);
+    makeOffer(usdcValue, bldValue, yieldProtocol, evmChainParam, openPositionSelectedSteps);
   };
 
   // Handle withdrawing USDC
@@ -130,6 +194,7 @@ const Trade = ({
       withdrawFromProtocolState,
       evmChainParam,
       withdrawPrevOfferId.trim(),
+      withdrawSelectedSteps,
     );
   };
 
@@ -335,6 +400,17 @@ const Trade = ({
               After locking funds, you can withdraw using the withdraw button.
             </p> */}
           </div>
+          
+          <StepSelector
+            title="Show Steps"
+            steps={generateOpenPositionSteps(
+              yieldProtocol,
+              evmChain,
+              BigInt(Math.floor(parseFloat(usdcAmount.trim()) * 1_000_000))
+            )}
+            onSelectionChange={setOpenPositionSelectedSteps}
+            className="open-position-steps"
+          />
         </div>
 
         <div className="option-card">
@@ -357,14 +433,51 @@ const Trade = ({
 
           <div className="input-row">
             <div className="input-group">
-              <label htmlFor="withdraw-prev-offer-id">Previous Offer ID:</label>
-              <input
-                id="withdraw-prev-offer-id"
-                type="text"
-                value={withdrawPrevOfferId}
-                onChange={e => setWithdrawPrevOfferId(e.target.value)}
-                placeholder="Enter previous offer ID"
-              />
+              <label htmlFor="withdraw-prev-offer-id">
+                Previous Offer ID:
+                {isLoadingOfferId && (
+                  <span className="loading-indicator"> (Loading...)</span>
+                )}
+                {autoFetchedOfferId && !isLoadingOfferId && (
+                  <span className="auto-fetched-indicator"> (Auto-fetched)</span>
+                )}
+              </label>
+              <div className="input-with-button">
+                <input
+                  id="withdraw-prev-offer-id"
+                  type="text"
+                  value={withdrawPrevOfferId}
+                  onChange={e => setWithdrawPrevOfferId(e.target.value)}
+                  placeholder={
+                    isLoadingOfferId 
+                      ? "Fetching latest offer ID..." 
+                      : "Enter previous offer ID"
+                  }
+                  disabled={isLoadingOfferId}
+                />
+                {walletConnected && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleRefreshOfferId}
+                      disabled={isLoadingOfferId}
+                      className="refresh-offer-button"
+                      title="Refresh latest offer ID from blockchain"
+                    >
+                      {isLoadingOfferId ? '⟳' : '🔄'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => walletAddress && watcher && testVstoragePath(watcher, walletAddress)}
+                      className="refresh-offer-button"
+                      title="Test vstorage path"
+                      style={{ marginLeft: '4px' }}
+                    >
+                      🔧
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -429,6 +542,17 @@ const Trade = ({
               protocol position back to your USDC balance.
             </p>
           </div>
+
+          <StepSelector
+            title="Show Steps"
+            steps={generateWithdrawSteps(
+              withdrawFromProtocolState,
+              withdrawEvmChain,
+              BigInt(Math.floor(parseFloat(withdrawAmount.trim()) * 1_000_000))
+            )}
+            onSelectionChange={setWithdrawSelectedSteps}
+            className="withdraw-steps"
+          />
         </div>
 
         <div className="option-card">

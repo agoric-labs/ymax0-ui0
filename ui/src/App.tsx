@@ -92,6 +92,8 @@ const makeOffer = (
   usdcAmount: bigint = 1_250_000n,
   bldFeeAmount: bigint = 20_000_000n,
   yProtocol: YieldProtocol = 'Aave',
+  evmChain: EVMChain = 'Avalanche',
+  selectedSteps?: string[],
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -127,13 +129,39 @@ const makeOffer = (
     value: giveValue,
   };
 
-  const { give, steps } = makePortfolioSteps(position, {
-    evm: 'Avalanche',
+  const { give, steps: allSteps } = makePortfolioSteps(position, {
+    evm: evmChain,
     feeBrand: BLDBrand as Brand<'nat'>,
     feeBasisPoints: bldFeeAmount,
     detail:
       yProtocol === 'USDN' ? { usdnOut: (giveValue * 99n) / 100n } : undefined,
   });
+
+  // Filter steps based on selection if provided
+  const steps = selectedSteps && selectedSteps.length > 0 ? 
+    allSteps.filter((step, index) => {
+      // For now, we'll use a simple index-based approach
+      // In a more sophisticated implementation, you'd match steps by their properties
+      return selectedSteps.includes(`step-${index}`) || 
+             selectedSteps.some(id => {
+               switch (id) {
+                 case 'access-token':
+                   return true; // Always include access token
+                 case 'deposit-to-agoric':
+                   return step.src === '<Deposit>' && step.dest === '@agoric';
+                 case 'agoric-to-noble':
+                   return step.src === '@agoric' && step.dest === '@noble';
+                 case 'noble-to-usdn':
+                   return step.src === '@noble' && step.dest === 'USDNVault';
+                 case 'noble-to-evm':
+                   return step.src === '@noble' && step.dest === `@${evmChain}`;
+                 case `evm-to-${yProtocol.toLowerCase()}`:
+                   return step.src === `@${evmChain}` && step.dest === `${yProtocol}_${evmChain}`;
+                 default:
+                   return false;
+               }
+             });
+    }) : allSteps;
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
@@ -261,6 +289,7 @@ const withdrawFromProtocol = (
   fromProtocol: YieldProtocol,
   evmChain?: EVMChain,
   prevOfferId?: string,
+  selectedSteps?: string[],
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -300,7 +329,7 @@ const withdrawFromProtocol = (
   });
 
   const amount = proposal.want.Cash;
-  const steps: MovementDesc[] = [];
+  const allSteps: MovementDesc[] = [];
 
   // Default fee amount (2 BLD = 2,000,000 micro-BLD)
   const defaultFee = { brand: bldBrand as Brand<'nat'>, value: 15_000_000n };
@@ -308,7 +337,7 @@ const withdrawFromProtocol = (
   // Create withdrawal steps based on protocol
   switch (fromProtocol) {
     case 'USDN':
-      steps.push(
+      allSteps.push(
         { src: 'USDNVault', dest: '@noble', amount },
         { src: '@noble', dest: '@agoric', amount },
         { src: '@agoric', dest: '<Cash>', amount },
@@ -317,7 +346,7 @@ const withdrawFromProtocol = (
     case 'Aave':
     case 'Compound':
       const chain = evmChain || 'Avalanche';
-      steps.push(
+      allSteps.push(
         {
           src: `${fromProtocol}_${chain}`,
           dest: `@${chain}`,
@@ -333,6 +362,27 @@ const withdrawFromProtocol = (
       alert(`Unsupported protocol: ${fromProtocol}`);
       return;
   }
+
+  // Filter steps based on selection if provided
+  const steps = selectedSteps && selectedSteps.length > 0 ?
+    allSteps.filter((step) => {
+      return selectedSteps.some(id => {
+        switch (id) {
+          case 'usdn-to-noble':
+            return step.src === 'USDNVault' && step.dest === '@noble';
+          case `${fromProtocol.toLowerCase()}-to-evm`:
+            return step.src === `${fromProtocol}_${evmChain || 'Avalanche'}` && step.dest === `@${evmChain || 'Avalanche'}`;
+          case 'evm-to-noble':
+            return step.src === `@${evmChain || 'Avalanche'}` && step.dest === '@noble';
+          case 'noble-to-agoric':
+            return step.src === '@noble' && step.dest === '@agoric';
+          case 'receive-cash':
+            return step.src === '@agoric' && step.dest === '<Cash>';
+          default:
+            return false;
+        }
+      });
+    }) : allSteps;
 
   wallet?.makeOffer(
     {
@@ -714,8 +764,8 @@ const MainPage = () => {
           <div className="card">
             {' '}
             <Trade
-              makeOffer={(usdcAmount, bldFeeAmount, yProtocol) =>
-                makeOffer(usdcAmount, bldFeeAmount, yProtocol)
+              makeOffer={(usdcAmount, bldFeeAmount, yProtocol, evmChain, selectedSteps) =>
+                makeOffer(usdcAmount, bldFeeAmount, yProtocol, evmChain, selectedSteps)
               }
               withdrawUSDC={withdrawUSDC}
               withdrawFromProtocol={withdrawFromProtocol}
@@ -728,6 +778,8 @@ const MainPage = () => {
               usdcPurse={usdcPurse as Purse}
               bldPurse={bldPurse as Purse}
               poc26Purse={poc26Purse as Purse}
+              walletAddress={wallet?.address}
+              watcher={watcher}
             />
             <hr />
             {wallet && istPurse ? (

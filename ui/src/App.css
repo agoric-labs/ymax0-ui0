@@ -622,6 +622,217 @@ pre {
   box-shadow: var(--shadow-md);
 }
 
+/* Step Selector Styles */
+.step-selector {
+  margin: var(--space-md) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.step-selector-header {
+  display: flex;
+  align-items: center;
+}
+
+.step-toggle-button {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-secondary);
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: all var(--transition-fast);
+}
+
+.step-toggle-button:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+.step-toggle-icon {
+  font-size: 0.875rem;
+  min-width: 16px;
+}
+
+.step-selector-content {
+  padding: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.step-selector-controls {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.step-control-button {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.step-control-button:hover {
+  background: #e97c0a;
+  transform: translateY(-1px);
+}
+
+.step-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.step-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  transition: all var(--transition-fast);
+}
+
+.step-item:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.step-item-label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  cursor: pointer;
+  width: 100%;
+}
+
+.step-checkbox {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+}
+
+
+.step-info {
+  flex: 1;
+  text-align: left;
+}
+
+.step-name {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: 2px;
+}
+
+.step-description {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.step-movement {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  display: inline-block;
+}
+
+.step-fee {
+  color: var(--color-warning);
+  font-weight: 500;
+}
+
+
+.step-warning {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-sm);
+  color: #92400e;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.warning-icon {
+  font-size: 1rem;
+}
+
+/* Offer ID auto-fetch indicators */
+.loading-indicator {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+.auto-fetched-indicator {
+  color: var(--color-success, #10b981);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Input with button layout */
+.input-with-button {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.refresh-offer-button {
+  padding: var(--space-xs);
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 1rem;
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.refresh-offer-button:hover:not(:disabled) {
+  background: #e97c0a;
+  transform: translateY(-1px);
+}
+
+.refresh-offer-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.refresh-offer-button:disabled:hover {
+  transform: none;
+}
+
 /* Modal Styles */
 .modal {
   display: block;
