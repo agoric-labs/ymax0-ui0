@@ -643,7 +643,7 @@ const Admin: React.FC<AdminProps> = ({
   const fetchTransactions = async () => {
     if (!wallet?.address) return;
 
-    const url = `${ENDPOINTS.API}/cosmos/tx/v1beta1/txs?events=message.sender='${wallet.address}'&order_by=ORDER_BY_DESC&limit=${transactionLimit}`;
+    const url = `${ENDPOINTS.API}/cosmos/tx/v1beta1/txs?query=message.sender='${wallet.address}'&order_by=ORDER_BY_DESC&limit=${transactionLimit}`;
     try {
       const response = await fetch(url);
       if (!response.ok) {
