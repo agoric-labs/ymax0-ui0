@@ -55,6 +55,7 @@
   justify-content: space-between;
   align-items: center;
   max-width: calc(1600px - (2 * var(--space-md)));
+  max-height: 20px;
   margin: 0 auto var(--space-lg) auto;
   padding: var(--space-md);
   background: var(--color-bg-secondary);
@@ -888,7 +889,8 @@ pre {
 /* Tabs Styles */
 .tabs-container {
   width: 100%;
-  margin: 0;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .tabs-header {
@@ -963,11 +965,16 @@ pre {
   border: 1px solid var(--color-border);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   min-height: 400px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Tab Panel Styles */
 .tab-panel {
   padding: var(--space-lg);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -991,6 +998,8 @@ pre {
 .form-section {
   max-width: 1200px;
   margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .input-row {
@@ -1351,6 +1360,10 @@ pre {
   border-radius: var(--radius-md);
   padding: var(--space-md);
   margin: var(--space-md) 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .transaction-details h4 {
@@ -1364,6 +1377,9 @@ pre {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .detail-row {
@@ -1372,6 +1388,10 @@ pre {
   align-items: center;
   padding: var(--space-xs) 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .detail-row:last-child {
@@ -1390,6 +1410,10 @@ pre {
   font-size: 0.875rem;
   text-align: right;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .transaction-address {
@@ -1399,8 +1423,11 @@ pre {
   padding: var(--space-xs);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  word-break: break-all;
-  max-width: 300px;
+  max-width: 250px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-pending {

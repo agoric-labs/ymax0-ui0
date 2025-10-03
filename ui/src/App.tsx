@@ -718,7 +718,6 @@ const MainPage = () => {
           </div>
 
           <div className="environment-selector-header">
-            <label htmlFor="env-select">Environment:</label>
             <select
               id="env-select"
               value={environment}
