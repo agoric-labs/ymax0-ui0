@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 import './App.css';
@@ -32,7 +32,7 @@ const { fromEntries } = Object;
 let ENDPOINTS = configureEndpoints(getInitialEnvironment(), true);
 let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
-const useAppStore = create<AppState>(() => ({} as AppState));
+const useAppStore = create<AppState>(() => ({}) as AppState);
 
 const setup = async () => {
   watcher.watchLatest<Array<[string, unknown]>>(
@@ -138,30 +138,37 @@ const makeOffer = (
   });
 
   // Filter steps based on selection if provided
-  const steps = selectedSteps && selectedSteps.length > 0 ? 
-    allSteps.filter((step, index) => {
-      // For now, we'll use a simple index-based approach
-      // In a more sophisticated implementation, you'd match steps by their properties
-      return selectedSteps.includes(`step-${index}`) || 
-             selectedSteps.some(id => {
-               switch (id) {
-                 case 'access-token':
-                   return true; // Always include access token
-                 case 'deposit-to-agoric':
-                   return step.src === '<Deposit>' && step.dest === '@agoric';
-                 case 'agoric-to-noble':
-                   return step.src === '@agoric' && step.dest === '@noble';
-                 case 'noble-to-usdn':
-                   return step.src === '@noble' && step.dest === 'USDNVault';
-                 case 'noble-to-evm':
-                   return step.src === '@noble' && step.dest === `@${evmChain}`;
-                 case `evm-to-${yProtocol.toLowerCase()}`:
-                   return step.src === `@${evmChain}` && step.dest === `${yProtocol}_${evmChain}`;
-                 default:
-                   return false;
-               }
-             });
-    }) : allSteps;
+  const steps =
+    selectedSteps && selectedSteps.length > 0
+      ? allSteps.filter((step, index) => {
+          // For now, we'll use a simple index-based approach
+          // In a more sophisticated implementation, you'd match steps by their properties
+          return (
+            selectedSteps.includes(`step-${index}`) ||
+            selectedSteps.some(id => {
+              switch (id) {
+                case 'access-token':
+                  return true; // Always include access token
+                case 'deposit-to-agoric':
+                  return step.src === '<Deposit>' && step.dest === '@agoric';
+                case 'agoric-to-noble':
+                  return step.src === '@agoric' && step.dest === '@noble';
+                case 'noble-to-usdn':
+                  return step.src === '@noble' && step.dest === 'USDNVault';
+                case 'noble-to-evm':
+                  return step.src === '@noble' && step.dest === `@${evmChain}`;
+                case `evm-to-${yProtocol.toLowerCase()}`:
+                  return (
+                    step.src === `@${evmChain}` &&
+                    step.dest === `${yProtocol}_${evmChain}`
+                  );
+                default:
+                  return false;
+              }
+            })
+          );
+        })
+      : allSteps;
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
@@ -364,25 +371,33 @@ const withdrawFromProtocol = (
   }
 
   // Filter steps based on selection if provided
-  const steps = selectedSteps && selectedSteps.length > 0 ?
-    allSteps.filter((step) => {
-      return selectedSteps.some(id => {
-        switch (id) {
-          case 'usdn-to-noble':
-            return step.src === 'USDNVault' && step.dest === '@noble';
-          case `${fromProtocol.toLowerCase()}-to-evm`:
-            return step.src === `${fromProtocol}_${evmChain || 'Avalanche'}` && step.dest === `@${evmChain || 'Avalanche'}`;
-          case 'evm-to-noble':
-            return step.src === `@${evmChain || 'Avalanche'}` && step.dest === '@noble';
-          case 'noble-to-agoric':
-            return step.src === '@noble' && step.dest === '@agoric';
-          case 'receive-cash':
-            return step.src === '@agoric' && step.dest === '<Cash>';
-          default:
-            return false;
-        }
-      });
-    }) : allSteps;
+  const steps =
+    selectedSteps && selectedSteps.length > 0
+      ? allSteps.filter(step => {
+          return selectedSteps.some(id => {
+            switch (id) {
+              case 'usdn-to-noble':
+                return step.src === 'USDNVault' && step.dest === '@noble';
+              case `${fromProtocol.toLowerCase()}-to-evm`:
+                return (
+                  step.src === `${fromProtocol}_${evmChain || 'Avalanche'}` &&
+                  step.dest === `@${evmChain || 'Avalanche'}`
+                );
+              case 'evm-to-noble':
+                return (
+                  step.src === `@${evmChain || 'Avalanche'}` &&
+                  step.dest === '@noble'
+                );
+              case 'noble-to-agoric':
+                return step.src === '@noble' && step.dest === '@agoric';
+              case 'receive-cash':
+                return step.src === '@agoric' && step.dest === '<Cash>';
+              default:
+                return false;
+            }
+          });
+        })
+      : allSteps;
 
   wallet?.makeOffer(
     {
@@ -646,70 +661,12 @@ const MainPage = () => {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
-  // Ref for chat iframe
-  const chatIframeRef = useRef<HTMLIFrameElement>(null);
 
-  useEffect(() => {
-    // Prevent iframe scrolling from affecting parent page
-    const handleIframeLoad = () => {
-      if (chatIframeRef.current) {
-        try {
-          // Try to access iframe content if same origin allows it
-          const iframeWindow = chatIframeRef.current.contentWindow;
-          if (iframeWindow) {
-            iframeWindow.addEventListener('scroll', e => {
-              e.stopPropagation();
-            });
-
-            // Attempt to add scroll containment to iframe document if possible
-            iframeWindow.document.body.style.overflow = 'auto';
-            iframeWindow.document.body.style.overscrollBehavior = 'contain';
-          }
-        } catch (e) {
-          // Cross-origin restrictions will likely prevent access
-          console.log(
-            'Cannot access iframe content due to cross-origin policy',
-          );
-        }
-      }
-    };
-
-    // Prevent wheel events from propagating outside the chat sidebar
-    const chatSidebar = document.querySelector('.chat-sidebar');
-    const preventPropagation = (e: Event) => {
-      e.stopPropagation();
-    };
-
-    if (chatSidebar) {
-      chatSidebar.addEventListener('wheel', preventPropagation);
-      chatSidebar.addEventListener('touchmove', preventPropagation);
-    }
-
-    // Add load event listener to iframe if available
-    if (chatIframeRef.current) {
-      chatIframeRef.current.addEventListener('load', handleIframeLoad);
-    }
-
-    return () => {
-      // Clean up event listeners
-      if (chatIframeRef.current) {
-        chatIframeRef.current.removeEventListener('load', handleIframeLoad);
-      }
-
-      if (chatSidebar) {
-        chatSidebar.removeEventListener('wheel', preventPropagation);
-        chatSidebar.removeEventListener('touchmove', preventPropagation);
-      }
-    };
-  }, []);
-
-  const { wallet, purses, offerId } = useAppStore(
-    (state: AppState) => ({
-      wallet: state.wallet,
-      purses: state.purses,
-      offerId: state.offerId,
-    }),
-  );
+  const { wallet, purses, offerId } = useAppStore((state: AppState) => ({
+    wallet: state.wallet,
+    purses: state.purses,
+    offerId: state.offerId,
+  }));
   const istPurse = purses?.find((p: Purse) => p.brandPetname === 'IST');
   const itemsPurse = purses?.find((p: Purse) => p.brandPetname === 'Items');
   const usdcPurse = purses?.find((p: Purse) => p.brandPetname === 'USDC');
@@ -735,26 +692,43 @@ const MainPage = () => {
 
   return (
     <>
-      <div style={{ position: 'relative' }}>
+      {/* Top header with logo and wallet status */}
+      <div className="top-header">
         <Logos />
+        <div className="wallet-header-inline">
+          <div className="wallet-status">
+            {wallet && wallet.address ? (
+              <div className="wallet-connected">
+                <div className="wallet-info">
+                  <span className="wallet-address">{wallet.address}</span>
+                </div>
+                <div className="connection-status">
+                  <span className="status-indicator connected"></span>
+                  <span className="status-text">Connected</span>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={tryConnectWallet}
+                className="connect-wallet-button"
+              >
+                Connect Wallet
+              </button>
+            )}
+          </div>
 
-        <div className="environment-selector">
-          <label htmlFor="environment-select">Env: </label>
-          <select
-            id="environment-select"
-            value={environment}
-            onChange={handleEnvironmentChange}
-          >
-            <option value="mainnet">Mainnet</option>
-            <option value="devnet">Devnet</option>
-            <option value="localhost">Localhost</option>
-          </select>
-          <div className="environment-info">
-            <small>
-              RPC: {ENDPOINTS.RPC}
-              <br />
-              API: {ENDPOINTS.API}
-            </small>
+          <div className="environment-selector-header">
+            <label htmlFor="env-select">Environment:</label>
+            <select
+              id="env-select"
+              value={environment}
+              onChange={handleEnvironmentChange}
+              className="env-selector"
+            >
+              <option value="mainnet">Mainnet</option>
+              <option value="devnet">Devnet</option>
+              <option value="localhost">Localhost</option>
+            </select>
           </div>
         </div>
       </div>
@@ -762,10 +736,21 @@ const MainPage = () => {
       <div className="app-container">
         <div className="main-content">
           <div className="card">
-            {' '}
             <Trade
-              makeOffer={(usdcAmount, bldFeeAmount, yProtocol, evmChain, selectedSteps) =>
-                makeOffer(usdcAmount, bldFeeAmount, yProtocol, evmChain, selectedSteps)
+              makeOffer={(
+                usdcAmount,
+                bldFeeAmount,
+                yProtocol,
+                evmChain,
+                selectedSteps,
+              ) =>
+                makeOffer(
+                  usdcAmount,
+                  bldFeeAmount,
+                  yProtocol,
+                  evmChain,
+                  selectedSteps,
+                )
               }
               withdrawUSDC={withdrawUSDC}
               withdrawFromProtocol={withdrawFromProtocol}
@@ -781,32 +766,19 @@ const MainPage = () => {
               walletAddress={wallet?.address}
               watcher={watcher}
             />
-            <hr />
-            {wallet && istPurse ? (
-              <Inventory
-                address={wallet.address}
-                istPurse={istPurse}
-                itemsPurse={itemsPurse as Purse}
-                usdcPurse={usdcPurse as Purse}
-                bldPurse={bldPurse as Purse}
-                poc26Purse={poc26Purse as Purse}
-              />
-            ) : (
-              <button onClick={tryConnectWallet}>Connect Wallet</button>
+            {wallet && istPurse && (
+              <>
+                <hr />
+                <Inventory
+                  address={wallet.address}
+                  istPurse={istPurse}
+                  itemsPurse={itemsPurse as Purse}
+                  usdcPurse={usdcPurse as Purse}
+                  bldPurse={bldPurse as Purse}
+                  poc26Purse={poc26Purse as Purse}
+                />
+              </>
             )}
-          </div>
-        </div>
-
-        <div className="chat-sidebar">
-          <h3>Agoric Community Chat</h3>
-          <div className="iframe-container">
-            <iframe
-              ref={chatIframeRef}
-              src="https://chat.agoric.net/"
-              title="Agoric Community Chat"
-              className="chat-iframe"
-              sandbox="allow-scripts allow-same-origin allow-forms"
-            ></iframe>
           </div>
         </div>
       </div>
@@ -819,13 +791,11 @@ function App() {
     setup();
   }, []);
 
-  const { wallet, instances, purses } = useAppStore(
-    (state: AppState) => ({
-      wallet: state.wallet,
-      instances: state.instances,
-      purses: state.purses,
-    }),
-  );
+  const { wallet, instances, purses } = useAppStore((state: AppState) => ({
+    wallet: state.wallet,
+    instances: state.instances,
+    purses: state.purses,
+  }));
 
   return (
     <Routes>
