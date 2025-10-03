@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { YieldProtocol, EVMChain } from '../ymax-client';
 import { StepSelector, StepInfo } from './StepSelector';
 import { generateOpenPositionSteps, generateWithdrawSteps } from '../utils/stepUtils';
-import { getLatestOpenPortfolioOfferId, testVstoragePath } from '../utils/walletUtils';
+import { getLatestOpenPortfolioOfferId, getLatestResolverOfferId } from '../utils/walletUtils';
 
 type TradeProps = {
   makeOffer: (
@@ -85,6 +85,10 @@ const Trade = ({
   const [isLoadingOfferId, setIsLoadingOfferId] = useState(false);
   const [autoFetchedOfferId, setAutoFetchedOfferId] = useState<string | null>(null);
 
+  // Auto-fetched resolver offer ID state (for settle transaction)
+  const [isLoadingResolverOfferId, setIsLoadingResolverOfferId] = useState(false);
+  const [autoFetchedResolverOfferId, setAutoFetchedResolverOfferId] = useState<string | null>(null);
+
   // Fetch latest offer ID when wallet is connected
   useEffect(() => {
     const fetchLatestOfferId = async () => {
@@ -113,6 +117,34 @@ const Trade = ({
     return () => clearTimeout(timeoutId);
   }, [walletConnected, walletAddress, watcher, isLoadingOfferId]);
 
+  // Fetch latest resolver offer ID when wallet is connected
+  useEffect(() => {
+    const fetchLatestResolverOfferId = async () => {
+      if (walletConnected && walletAddress && watcher && !isLoadingResolverOfferId) {
+        setIsLoadingResolverOfferId(true);
+        try {
+          console.log('Fetching latest resolver offer ID for wallet:', walletAddress);
+          const latestResolverOfferId = await getLatestResolverOfferId(watcher, walletAddress);
+          console.log('Fetched resolver offer ID:', latestResolverOfferId);
+          if (latestResolverOfferId) {
+            setAutoFetchedResolverOfferId(latestResolverOfferId);
+            setPrevOfferId(latestResolverOfferId);
+          } else {
+            console.log('No resolver offers found for this wallet');
+          }
+        } catch (error) {
+          console.error('Failed to fetch latest resolver offer ID:', error);
+        } finally {
+          setIsLoadingResolverOfferId(false);
+        }
+      }
+    };
+
+    // Add a small delay to ensure wallet connection is fully established
+    const timeoutId = setTimeout(fetchLatestResolverOfferId, 1200); // Slightly after openPortfolio fetch
+    return () => clearTimeout(timeoutId);
+  }, [walletConnected, walletAddress, watcher, isLoadingResolverOfferId]);
+
   // Manual refresh function
   const handleRefreshOfferId = async () => {
     if (walletConnected && walletAddress && watcher && !isLoadingOfferId) {
@@ -128,6 +160,25 @@ const Trade = ({
         alert('Failed to fetch latest offer ID. Please check console for details.');
       } finally {
         setIsLoadingOfferId(false);
+      }
+    }
+  };
+
+  // Manual refresh function for resolver offer ID
+  const handleRefreshResolverOfferId = async () => {
+    if (walletConnected && walletAddress && watcher && !isLoadingResolverOfferId) {
+      setIsLoadingResolverOfferId(true);
+      try {
+        const latestResolverOfferId = await getLatestResolverOfferId(watcher, walletAddress);
+        if (latestResolverOfferId) {
+          setAutoFetchedResolverOfferId(latestResolverOfferId);
+          setPrevOfferId(latestResolverOfferId);
+        }
+      } catch (error) {
+        console.error('Failed to refresh resolver offer ID:', error);
+        alert('Failed to fetch latest resolver offer ID. Please check console for details.');
+      } finally {
+        setIsLoadingResolverOfferId(false);
       }
     }
   };
@@ -456,26 +507,15 @@ const Trade = ({
                   disabled={isLoadingOfferId}
                 />
                 {walletConnected && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleRefreshOfferId}
-                      disabled={isLoadingOfferId}
-                      className="refresh-offer-button"
-                      title="Refresh latest offer ID from blockchain"
-                    >
-                      {isLoadingOfferId ? '⟳' : '🔄'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => walletAddress && watcher && testVstoragePath(watcher, walletAddress)}
-                      className="refresh-offer-button"
-                      title="Test vstorage path"
-                      style={{ marginLeft: '4px' }}
-                    >
-                      🔧
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={handleRefreshOfferId}
+                    disabled={isLoadingOfferId}
+                    className="refresh-offer-button"
+                    title="Refresh latest offer ID from blockchain"
+                  >
+                    {isLoadingOfferId ? '⟳' : '🔄'}
+                  </button>
                 )}
               </div>
             </div>
@@ -588,14 +628,40 @@ const Trade = ({
 
           <div className="input-row">
             <div className="input-group">
-              <label htmlFor="prev-offer-id">Previous Offer ID:</label>
-              <input
-                id="prev-offer-id"
-                type="text"
-                value={prevOfferId}
-                onChange={e => setPrevOfferId(e.target.value)}
-                placeholder="Enter previous offer ID"
-              />
+              <label htmlFor="prev-offer-id">
+                Previous Offer ID:
+                {isLoadingResolverOfferId && (
+                  <span className="loading-indicator"> (Loading...)</span>
+                )}
+                {autoFetchedResolverOfferId && !isLoadingResolverOfferId && (
+                  <span className="auto-fetched-indicator"> (Auto-fetched)</span>
+                )}
+              </label>
+              <div className="input-with-button">
+                <input
+                  id="prev-offer-id"
+                  type="text"
+                  value={prevOfferId}
+                  onChange={e => setPrevOfferId(e.target.value)}
+                  placeholder={
+                    isLoadingResolverOfferId
+                      ? "Fetching latest resolver offer ID..."
+                      : "Enter previous offer ID"
+                  }
+                  disabled={isLoadingResolverOfferId}
+                />
+                {walletConnected && (
+                  <button
+                    type="button"
+                    onClick={handleRefreshResolverOfferId}
+                    disabled={isLoadingResolverOfferId}
+                    className="refresh-offer-button"
+                    title="Refresh latest resolver offer ID from blockchain"
+                  >
+                    {isLoadingResolverOfferId ? '⟳' : '🔄'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

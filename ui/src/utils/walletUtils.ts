@@ -121,11 +121,43 @@ export const extractOffersFromWalletState = (walletState: WalletState): ParsedOf
  * Finds the most recent offer ID with a specific description
  */
 export const findLatestOfferByDescription = (offers: ParsedOffer[], description: string): string | null => {
-  const matchingOffers = offers
-    .filter(offer => offer.description === description)
-    .sort((a, b) => parseInt(b.id) - parseInt(a.id)); // Sort by ID descending (most recent first)
+  const matchingOffers = offers.filter(offer => offer.description === description);
   
-  return matchingOffers.length > 0 ? matchingOffers[0].id : null;
+  if (matchingOffers.length === 0) {
+    console.log(`No offers found with description: ${description}`);
+    return null;
+  }
+  
+  // Sort by ID - handle both timestamp-only IDs and prefixed IDs
+  const sortedOffers = matchingOffers.sort((a, b) => {
+    // Extract timestamp from offer ID
+    // Handle cases like "1759417599404" or "redeem-2025-09-05T10:15:29.259Z"
+    const extractTimestamp = (id: string): number => {
+      // If it's a pure number (timestamp), use it directly
+      if (/^\d+$/.test(id)) {
+        return parseInt(id);
+      }
+      
+      // If it has a date format, extract timestamp from the date
+      const dateMatch = id.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)/);
+      if (dateMatch) {
+        return new Date(dateMatch[1]).getTime();
+      }
+      
+      // Fallback: try to parse as number anyway
+      const numMatch = id.match(/\d+/);
+      return numMatch ? parseInt(numMatch[0]) : 0;
+    };
+    
+    const aTimestamp = extractTimestamp(a.id);
+    const bTimestamp = extractTimestamp(b.id);
+    return bTimestamp - aTimestamp;
+  });
+  
+  const result = sortedOffers[0].id;
+  console.log(`Selected latest ${description} offer ID: ${result} (from ${matchingOffers.length} candidates)`);
+  
+  return result;
 };
 
 /**
@@ -168,12 +200,13 @@ export const fetchWalletState = async (
               const latestEntry = data[data.length - 1];
               console.log('Latest entry:', latestEntry);
               
-              walletState = parseWalletStateEntry(latestEntry);
-              if (!walletState) {
+              const parsedState = parseWalletStateEntry(latestEntry);
+              if (!parsedState) {
                 console.log('Failed to parse latest entry');
                 resolve([]);
                 return;
               }
+              walletState = parsedState;
             } else {
               console.log('Unknown data format:', typeof data, data);
               resolve([]);
@@ -230,6 +263,26 @@ export const getLatestOpenPortfolioOfferId = async (
     return result;
   } catch (error) {
     console.error('Error fetching latest openPortfolio offer ID:', error);
+    return null;
+  }
+};
+
+/**
+ * Gets the latest resolver offer ID for a wallet (used for settle transactions)
+ */
+export const getLatestResolverOfferId = async (
+  watcher: ReturnType<typeof makeAgoricChainStorageWatcher>,
+  walletAddress: string,
+): Promise<string | null> => {
+  try {
+    console.log('Starting getLatestResolverOfferId for:', walletAddress);
+    const offers = await fetchWalletState(watcher, walletAddress);
+    console.log('Received offers:', offers);
+    const result = findLatestOfferByDescription(offers, 'resolver');
+    console.log('Latest resolver offer ID:', result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching latest resolver offer ID:', error);
     return null;
   }
 };
