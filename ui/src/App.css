@@ -1339,6 +1339,103 @@ pre {
   }
 }
 
+/* Transaction Details Display */
+.transaction-details {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: var(--space-md) 0;
+}
+
+.transaction-details h4 {
+  margin: 0 0 var(--space-sm) 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+
+.transaction-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  min-width: 80px;
+}
+
+.detail-value {
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  text-align: right;
+  flex: 1;
+}
+
+.transaction-address {
+  font-family: monospace;
+  font-size: 0.8125rem;
+  background: var(--color-surface);
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  word-break: break-all;
+  max-width: 300px;
+}
+
+.status-pending {
+  color: var(--color-warning, #f59e0b);
+  font-weight: 600;
+}
+
+.status-failed {
+  color: var(--color-danger, #ef4444);
+  font-weight: 600;
+}
+
+.status-success {
+  color: var(--color-success, #10b981);
+  font-weight: 600;
+}
+
+/* Transaction Status Display */
+.transaction-status {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.transaction-status p {
+  margin: var(--space-xs) 0;
+  color: var(--color-text-primary);
+}
+
+.transaction-status code {
+  background: var(--color-surface);
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  font-family: monospace;
+  font-size: 0.875rem;
+  border: 1px solid var(--color-border);
+}
+
 /* Enhanced Info Section */
 .info-section {
   background: rgba(59, 130, 246, 0.1);
@@ -1480,4 +1577,60 @@ pre {
 .option-card h4 {
   margin-top: 0.25rem;
   margin-bottom: 0.5rem;
+}
+
+/* Checkbox styling for transaction filter */
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #636e72;
+  font-weight: 500;
+  user-select: none;
+}
+
+.transaction-filter-checkbox {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ddd;
+  border-radius: 3px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.transaction-filter-checkbox:checked {
+  background-color: #0066cc;
+  border-color: #0066cc;
+}
+
+.transaction-filter-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.transaction-filter-checkbox:hover {
+  border-color: #0066cc;
+}
+
+.transaction-filter-checkbox:focus {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
 }
