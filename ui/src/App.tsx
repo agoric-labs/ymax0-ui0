@@ -140,33 +140,28 @@ const makeOffer = (
   // Filter steps based on selection if provided
   const steps =
     selectedSteps && selectedSteps.length > 0
-      ? allSteps.filter((step, index) => {
-          // For now, we'll use a simple index-based approach
-          // In a more sophisticated implementation, you'd match steps by their properties
-          return (
-            selectedSteps.includes(`step-${index}`) ||
-            selectedSteps.some(id => {
-              switch (id) {
-                case 'access-token':
-                  return true; // Always include access token
-                case 'deposit-to-agoric':
-                  return step.src === '<Deposit>' && step.dest === '@agoric';
-                case 'agoric-to-noble':
-                  return step.src === '@agoric' && step.dest === '@noble';
-                case 'noble-to-usdn':
-                  return step.src === '@noble' && step.dest === 'USDNVault';
-                case 'noble-to-evm':
-                  return step.src === '@noble' && step.dest === `@${evmChain}`;
-                case `evm-to-${yProtocol.toLowerCase()}`:
-                  return (
-                    step.src === `@${evmChain}` &&
-                    step.dest === `${yProtocol}_${evmChain}`
-                  );
-                default:
-                  return false;
-              }
-            })
-          );
+      ? allSteps.filter(step => {
+          return selectedSteps.some(id => {
+            switch (id) {
+              case 'access-token':
+                return true; // Always include access token
+              case 'deposit-to-agoric':
+                return step.src === '<Deposit>' && step.dest === '@agoric';
+              case 'agoric-to-noble':
+                return step.src === '@agoric' && step.dest === '@noble';
+              case 'noble-to-usdn':
+                return step.src === '@noble' && step.dest === 'USDNVault';
+              case 'noble-to-evm':
+                return step.src === '@noble' && step.dest === `@${evmChain}`;
+              case `evm-to-${yProtocol.toLowerCase()}`:
+                return (
+                  step.src === `@${evmChain}` &&
+                  step.dest === `${yProtocol}_${evmChain}`
+                );
+              default:
+                return false;
+            }
+          });
         })
       : allSteps;
 
