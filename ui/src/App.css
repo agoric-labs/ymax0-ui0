@@ -534,6 +534,11 @@ pre {
   min-width: 120px;
 }
 
+.input-group input[type="checkbox"] {
+  width: auto !important;
+  min-width: auto !important;
+}
+
 .position-select {
   margin-top: var(--space-md);
 }
@@ -1589,7 +1594,7 @@ pre {
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   font-size: 14px;
   color: #636e72;
@@ -1599,14 +1604,18 @@ pre {
 
 .transaction-filter-checkbox {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  border: 2px solid #ddd;
-  border-radius: 3px;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px;
+  max-width: 8px;
+  border: 1px solid #ddd;
+  border-radius: 2px;
   position: relative;
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  flex-grow: 0;
+  box-sizing: border-box;
 }
 
 .transaction-filter-checkbox:checked {
