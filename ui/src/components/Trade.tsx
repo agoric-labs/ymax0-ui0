@@ -22,6 +22,7 @@ type TradeProps = {
     yieldProtocol: YieldProtocol,
     evmChain?: EVMChain,
     selectedSteps?: string[],
+    customSteps?: StepInfo[],
   ) => void;
   withdrawUSDC: () => void;
   withdrawFromProtocol: (
@@ -30,6 +31,7 @@ type TradeProps = {
     evmChain?: EVMChain,
     prevOfferId?: string,
     selectedSteps?: string[],
+    customSteps?: StepInfo[],
   ) => void;
   openEmptyPortfolio: () => void;
   acceptInvitation: () => void;
@@ -94,6 +96,14 @@ const Trade = ({
   const [withdrawSelectedSteps, setWithdrawSelectedSteps] = useState<string[]>(
     [],
   );
+
+  // Step ordering state
+  const [openPositionStepOrder, setOpenPositionStepOrder] = useState<StepInfo[]>([]);
+  const [withdrawStepOrder, setWithdrawStepOrder] = useState<StepInfo[]>([]);
+
+  // Custom steps state
+  const [openPositionCustomSteps, setOpenPositionCustomSteps] = useState<StepInfo[]>([]);
+  const [withdrawCustomSteps, setWithdrawCustomSteps] = useState<StepInfo[]>([]);
 
   // Auto-fetched offer ID state
   const [isLoadingOfferId, setIsLoadingOfferId] = useState(false);
@@ -427,6 +437,7 @@ const Trade = ({
       yieldProtocol,
       evmChainParam,
       openPositionSelectedSteps,
+      openPositionCustomSteps,
     );
   };
 
@@ -470,7 +481,36 @@ const Trade = ({
       evmChainParam,
       withdrawPrevOfferId.trim(),
       withdrawSelectedSteps,
+      withdrawCustomSteps,
     );
+  };
+
+  // Helper functions to combine generated steps with custom steps
+  const getOpenPositionStepsWithCustom = () => {
+    const baseSteps = generateOpenPositionSteps(
+      yieldProtocol,
+      evmChain,
+      BigInt(Math.floor(parseFloat(usdcAmount.trim()) * 1_000_000)),
+    );
+    return [...baseSteps, ...openPositionCustomSteps];
+  };
+
+  const getWithdrawStepsWithCustom = () => {
+    const baseSteps = generateWithdrawSteps(
+      withdrawFromProtocolState,
+      withdrawEvmChain,
+      BigInt(Math.floor(parseFloat(withdrawAmount.trim()) * 1_000_000)),
+    );
+    return [...baseSteps, ...withdrawCustomSteps];
+  };
+
+  // Handlers for custom step addition
+  const handleAddOpenPositionCustomStep = (newStep: StepInfo) => {
+    setOpenPositionCustomSteps(prev => [...prev, newStep]);
+  };
+
+  const handleAddWithdrawCustomStep = (newStep: StepInfo) => {
+    setWithdrawCustomSteps(prev => [...prev, newStep]);
   };
 
   // Create tab content components
@@ -481,143 +521,146 @@ const Trade = ({
         <p>Create a new position with USDC in yield protocols</p>
       </div>
 
-      <div className="form-section">
-        <div className="input-row three-cols">
-          <div className="input-group">
-            <label htmlFor="usdc-amount">USDC Amount:</label>
-            <input
-              id="usdc-amount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={usdcAmount}
-              onChange={e => setUsdcAmount(e.target.value)}
-              placeholder="Enter USDC amount"
-            />
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="bld-fee">BLD Fee Amount:</label>
-            <input
-              id="bld-fee"
-              type="number"
-              step="1"
-              min="1"
-              value={bldFeeAmount}
-              onChange={e => setBldFeeAmount(e.target.value)}
-              placeholder="Enter BLD fee amount"
-              disabled={yieldProtocol === 'USDN'}
-            />
-            {yieldProtocol === 'USDN' && (
-              <small className="fee-info">
-                No fee required for USDN protocol
-              </small>
-            )}
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="yield-protocol">Yield Protocol:</label>
-            <select
-              id="yield-protocol"
-              value={yieldProtocol}
-              onChange={e => setYieldProtocol(e.target.value as YieldProtocol)}
-              className="chain-selector"
-            >
-              <option value="USDN">USDN</option>
-              <option value="Aave">Aave</option>
-              <option value="Compound">Compound</option>
-            </select>
-          </div>
-        </div>
-
-        {/* EVM Chain Selector - only visible when Aave or Compound is selected */}
-        {(yieldProtocol === 'Aave' || yieldProtocol === 'Compound') && (
-          <div className="input-row">
+      <div className="tab-content-layout">
+        <div className="form-section">
+          <div className="input-row three-cols">
             <div className="input-group">
-              <label htmlFor="evm-chain">EVM Chain:</label>
+              <label htmlFor="usdc-amount">USDC Amount:</label>
+              <input
+                id="usdc-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={usdcAmount}
+                onChange={e => setUsdcAmount(e.target.value)}
+                placeholder="Enter USDC amount"
+              />
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="bld-fee">BLD Fee Amount:</label>
+              <input
+                id="bld-fee"
+                type="number"
+                step="1"
+                min="1"
+                value={bldFeeAmount}
+                onChange={e => setBldFeeAmount(e.target.value)}
+                placeholder="Enter BLD fee amount"
+                disabled={yieldProtocol === 'USDN'}
+              />
+              {yieldProtocol === 'USDN' && (
+                <small className="fee-info">
+                  No fee required for USDN protocol
+                </small>
+              )}
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="yield-protocol">Yield Protocol:</label>
               <select
-                id="evm-chain"
-                value={evmChain}
-                onChange={e => setEvmChain(e.target.value as EVMChain)}
+                id="yield-protocol"
+                value={yieldProtocol}
+                onChange={e => setYieldProtocol(e.target.value as YieldProtocol)}
                 className="chain-selector"
               >
-                <option value="Avalanche">Avalanche</option>
-                <option value="Arbitrum">Arbitrum</option>
-                <option value="Ethereum">Ethereum</option>
-                <option value="Base">Base</option>
+                <option value="USDN">USDN</option>
+                <option value="Aave">Aave</option>
+                <option value="Compound">Compound</option>
               </select>
             </div>
           </div>
-        )}
 
-        <div className="balance-display">
-          <h5>Current Balances:</h5>
-          <div className="balance-grid">
-            <div className="balance-card">
-              <div className="balance-label">USDC</div>
-              <div className="balance-value usdc">
-                {usdcPurse
-                  ? stringifyAmountValue(
-                      usdcPurse.currentAmount,
-                      usdcPurse.displayInfo.assetKind,
-                      usdcPurse.displayInfo.decimalPlaces,
-                    )
-                  : 'Loading...'}
+          {/* EVM Chain Selector - only visible when Aave or Compound is selected */}
+          {(yieldProtocol === 'Aave' || yieldProtocol === 'Compound') && (
+            <div className="input-row">
+              <div className="input-group">
+                <label htmlFor="evm-chain">EVM Chain:</label>
+                <select
+                  id="evm-chain"
+                  value={evmChain}
+                  onChange={e => setEvmChain(e.target.value as EVMChain)}
+                  className="chain-selector"
+                >
+                  <option value="Avalanche">Avalanche</option>
+                  <option value="Arbitrum">Arbitrum</option>
+                  <option value="Ethereum">Ethereum</option>
+                  <option value="Base">Base</option>
+                </select>
               </div>
             </div>
-            <div className="balance-card">
-              <div className="balance-label">BLD</div>
-              <div className="balance-value bld">
-                {bldPurse
-                  ? stringifyAmountValue(
-                      bldPurse.currentAmount,
-                      bldPurse.displayInfo.assetKind,
-                      bldPurse.displayInfo.decimalPlaces,
-                    )
-                  : 'Loading...'}
+          )}
+
+          <div className="balance-display">
+            <h5>Current Balances:</h5>
+            <div className="balance-grid">
+              <div className="balance-card">
+                <div className="balance-label">USDC</div>
+                <div className="balance-value usdc">
+                  {usdcPurse
+                    ? stringifyAmountValue(
+                        usdcPurse.currentAmount,
+                        usdcPurse.displayInfo.assetKind,
+                        usdcPurse.displayInfo.decimalPlaces,
+                      )
+                    : 'Loading...'}
+                </div>
               </div>
-            </div>
-            <div className="balance-card">
-              <div className="balance-label">PoC26</div>
-              <div className="balance-value poc26">
-                {poc26Purse
-                  ? stringifyAmountValue(
-                      poc26Purse.currentAmount,
-                      poc26Purse.displayInfo.assetKind,
-                      poc26Purse.displayInfo.decimalPlaces,
-                    )
-                  : 'Loading...'}
+              <div className="balance-card">
+                <div className="balance-label">BLD</div>
+                <div className="balance-value bld">
+                  {bldPurse
+                    ? stringifyAmountValue(
+                        bldPurse.currentAmount,
+                        bldPurse.displayInfo.assetKind,
+                        bldPurse.displayInfo.decimalPlaces,
+                      )
+                    : 'Loading...'}
+                </div>
+              </div>
+              <div className="balance-card">
+                <div className="balance-label">PoC26</div>
+                <div className="balance-value poc26">
+                  {poc26Purse
+                    ? stringifyAmountValue(
+                        poc26Purse.currentAmount,
+                        poc26Purse.displayInfo.assetKind,
+                        poc26Purse.displayInfo.decimalPlaces,
+                      )
+                    : 'Loading...'}
+                </div>
               </div>
             </div>
           </div>
+
+          <div className="info-section">
+            <p>
+              The offer is configured to only include the "give" part without a
+              "want" part.
+            </p>
+          </div>
+
+          <div className="action-section">
+            {walletConnected ? (
+              <button onClick={handleMakeOffer} className="primary-button">
+                Open Position
+              </button>
+            ) : (
+              <p>Please connect your wallet to make an offer.</p>
+            )}
+          </div>
         </div>
 
-        <div className="info-section">
-          <p>
-            The offer is configured to only include the "give" part without a
-            "want" part.
-          </p>
-        </div>
-
-        <StepSelector
-          title="Show Steps"
-          steps={generateOpenPositionSteps(
-            yieldProtocol,
-            evmChain,
-            BigInt(Math.floor(parseFloat(usdcAmount.trim()) * 1_000_000)),
-          )}
-          onSelectionChange={setOpenPositionSelectedSteps}
-          className="open-position-steps"
-        />
-
-        <div className="action-section">
-          {walletConnected ? (
-            <button onClick={handleMakeOffer} className="primary-button">
-              Open Position
-            </button>
-          ) : (
-            <p>Please connect your wallet to make an offer.</p>
-          )}
+        <div className="steps-sidebar">
+          <StepSelector
+            title="Show Steps"
+            steps={getOpenPositionStepsWithCustom()}
+            onSelectionChange={setOpenPositionSelectedSteps}
+            onStepsReorder={setOpenPositionStepOrder}
+            onAddCustomStep={handleAddOpenPositionCustomStep}
+            defaultAmount={usdcAmount}
+            className="open-position-steps"
+          />
         </div>
       </div>
     </div>
@@ -630,123 +673,126 @@ const Trade = ({
         <p>Withdraw funds from your protocol positions</p>
       </div>
 
-      <div className="form-section">
-        <div className="input-row three-cols">
-          <div className="input-group">
-            <label htmlFor="withdraw-amount">Withdraw Amount (USDC):</label>
-            <input
-              id="withdraw-amount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={withdrawAmount}
-              onChange={e => setWithdrawAmount(e.target.value)}
-              placeholder="Enter amount to withdraw"
-            />
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="withdraw-prev-offer-id">
-              Previous Offer ID:
-              {isLoadingOfferId && (
-                <span className="loading-indicator"> (Loading...)</span>
-              )}
-              {autoFetchedOfferId && !isLoadingOfferId && (
-                <span className="auto-fetched-indicator"> (Auto-fetched)</span>
-              )}
-            </label>
-            <div className="input-with-button">
-              <input
-                id="withdraw-prev-offer-id"
-                type="text"
-                value={withdrawPrevOfferId}
-                onChange={e => setWithdrawPrevOfferId(e.target.value)}
-                placeholder={
-                  isLoadingOfferId
-                    ? 'Fetching latest offer ID...'
-                    : 'Enter previous offer ID'
-                }
-                disabled={isLoadingOfferId}
-              />
-              {walletConnected && (
-                <button
-                  type="button"
-                  onClick={handleRefreshOfferId}
-                  disabled={isLoadingOfferId}
-                  className="refresh-offer-button"
-                  title="Refresh latest offer ID from blockchain"
-                >
-                  {isLoadingOfferId ? '⟳' : '🔄'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="withdraw-protocol">Withdraw From Protocol:</label>
-            <select
-              id="withdraw-protocol"
-              value={withdrawFromProtocolState}
-              onChange={e => setWithdrawFromProtocolState(e.target.value as YieldProtocol)}
-              className="chain-selector"
-            >
-              <option value="USDN">USDN</option>
-              <option value="Aave">Aave</option>
-              <option value="Compound">Compound</option>
-            </select>
-          </div>
-        </div>
-
-        {/* EVM Chain Selector - only visible when Aave or Compound is selected */}
-        {(withdrawFromProtocolState === 'Aave' ||
-          withdrawFromProtocolState === 'Compound') && (
-          <div className="input-row">
+      <div className="tab-content-layout">
+        <div className="form-section">
+          <div className="input-row three-cols">
             <div className="input-group">
-              <label htmlFor="withdraw-evm-chain">EVM Chain:</label>
+              <label htmlFor="withdraw-amount">Withdraw Amount (USDC):</label>
+              <input
+                id="withdraw-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={withdrawAmount}
+                onChange={e => setWithdrawAmount(e.target.value)}
+                placeholder="Enter amount to withdraw"
+              />
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="withdraw-prev-offer-id">
+                Previous Offer ID:
+                {isLoadingOfferId && (
+                  <span className="loading-indicator"> (Loading...)</span>
+                )}
+                {autoFetchedOfferId && !isLoadingOfferId && (
+                  <span className="auto-fetched-indicator"> (Auto-fetched)</span>
+                )}
+              </label>
+              <div className="input-with-button">
+                <input
+                  id="withdraw-prev-offer-id"
+                  type="text"
+                  value={withdrawPrevOfferId}
+                  onChange={e => setWithdrawPrevOfferId(e.target.value)}
+                  placeholder={
+                    isLoadingOfferId
+                      ? 'Fetching latest offer ID...'
+                      : 'Enter previous offer ID'
+                  }
+                  disabled={isLoadingOfferId}
+                />
+                {walletConnected && (
+                  <button
+                    type="button"
+                    onClick={handleRefreshOfferId}
+                    disabled={isLoadingOfferId}
+                    className="refresh-offer-button"
+                    title="Refresh latest offer ID from blockchain"
+                  >
+                    {isLoadingOfferId ? '⟳' : '🔄'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="withdraw-protocol">Withdraw From Protocol:</label>
               <select
-                id="withdraw-evm-chain"
-                value={withdrawEvmChain}
-                onChange={e => setWithdrawEvmChain(e.target.value as EVMChain)}
+                id="withdraw-protocol"
+                value={withdrawFromProtocolState}
+                onChange={e => setWithdrawFromProtocolState(e.target.value as YieldProtocol)}
                 className="chain-selector"
               >
-                <option value="Avalanche">Avalanche</option>
-                <option value="Arbitrum">Arbitrum</option>
-                <option value="Ethereum">Ethereum</option>
-                <option value="Base">Base</option>
+                <option value="USDN">USDN</option>
+                <option value="Aave">Aave</option>
+                <option value="Compound">Compound</option>
               </select>
             </div>
           </div>
-        )}
 
-        <div className="info-section">
-          <p>
-            This will withdraw the specified amount from your selected protocol
-            position back to your USDC balance.
-          </p>
+          {/* EVM Chain Selector - only visible when Aave or Compound is selected */}
+          {(withdrawFromProtocolState === 'Aave' ||
+            withdrawFromProtocolState === 'Compound') && (
+            <div className="input-row">
+              <div className="input-group">
+                <label htmlFor="withdraw-evm-chain">EVM Chain:</label>
+                <select
+                  id="withdraw-evm-chain"
+                  value={withdrawEvmChain}
+                  onChange={e => setWithdrawEvmChain(e.target.value as EVMChain)}
+                  className="chain-selector"
+                >
+                  <option value="Avalanche">Avalanche</option>
+                  <option value="Arbitrum">Arbitrum</option>
+                  <option value="Ethereum">Ethereum</option>
+                  <option value="Base">Base</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          <div className="info-section">
+            <p>
+              This will withdraw the specified amount from your selected protocol
+              position back to your USDC balance.
+            </p>
+          </div>
+
+          <div className="action-section">
+            {walletConnected ? (
+              <button
+                onClick={handleWithdrawFromProtocol}
+                className="primary-button"
+              >
+                Withdraw from Protocol
+              </button>
+            ) : (
+              <p>Please connect your wallet to withdraw.</p>
+            )}
+          </div>
         </div>
 
-        <StepSelector
-          title="Show Steps"
-          steps={generateWithdrawSteps(
-            withdrawFromProtocolState,
-            withdrawEvmChain,
-            BigInt(Math.floor(parseFloat(withdrawAmount.trim()) * 1_000_000)),
-          )}
-          onSelectionChange={setWithdrawSelectedSteps}
-          className="withdraw-steps"
-        />
-
-        <div className="action-section">
-          {walletConnected ? (
-            <button
-              onClick={handleWithdrawFromProtocol}
-              className="primary-button"
-            >
-              Withdraw from Protocol
-            </button>
-          ) : (
-            <p>Please connect your wallet to withdraw.</p>
-          )}
+        <div className="steps-sidebar">
+          <StepSelector
+            title="Show Steps"
+            steps={getWithdrawStepsWithCustom()}
+            onSelectionChange={setWithdrawSelectedSteps}
+            onStepsReorder={setWithdrawStepOrder}
+            onAddCustomStep={handleAddWithdrawCustomStep}
+            defaultAmount={withdrawAmount}
+            className="withdraw-steps"
+          />
         </div>
       </div>
     </div>

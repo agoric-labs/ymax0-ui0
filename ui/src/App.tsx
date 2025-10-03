@@ -17,6 +17,7 @@ import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
 import { makePortfolioSteps } from './ymax-client.ts';
+import { StepInfo } from './components/StepSelector';
 import type {
   Environment,
   AppState,
@@ -24,6 +25,7 @@ import type {
   EVMChain,
   MovementDesc,
 } from './types';
+import type { Brand } from '@agoric/ertp/src/types.js';
 import { getBrand } from './utils';
 import { getInitialEnvironment, configureEndpoints } from './config';
 
@@ -94,6 +96,7 @@ const makeOffer = (
   yProtocol: YieldProtocol = 'Aave',
   evmChain: EVMChain = 'Avalanche',
   selectedSteps?: string[],
+  customSteps?: StepInfo[],
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -137,8 +140,32 @@ const makeOffer = (
       yProtocol === 'USDN' ? { usdnOut: (giveValue * 99n) / 100n } : undefined,
   });
 
+  // Convert custom steps to MovementDesc format and add selected ones
+  const customMovements: MovementDesc[] = [];
+  if (customSteps && selectedSteps) {
+    customSteps.forEach(customStep => {
+      if (selectedSteps.includes(customStep.id) && customStep.movement) {
+        // Convert StepInfo movement to proper MovementDesc with correct brands
+        const movement: MovementDesc = {
+          src: customStep.movement.src,
+          dest: customStep.movement.dest,
+          amount: {
+            brand: usdcBrand as Brand<'nat'>,
+            value: customStep.movement.amount.value,
+          },
+          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
+            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+            value: 40n 
+          } : undefined),
+          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+        };
+        customMovements.push(movement);
+      }
+    });
+  }
+
   // Filter steps based on selection if provided
-  const steps =
+  const baseSteps =
     selectedSteps && selectedSteps.length > 0
       ? allSteps.filter(step => {
           return selectedSteps.some(id => {
@@ -164,6 +191,9 @@ const makeOffer = (
           });
         })
       : allSteps;
+
+  // Combine base steps with custom steps
+  const steps = [...baseSteps, ...customMovements];
 
   console.log('Making offer with:', {
     instance: offerUpInstance,
@@ -248,9 +278,36 @@ const withdrawUSDC = () => {
   const { yProtocol = 'USDN' } = useAppStore.getState();
 
   const steps: MovementDesc[] = [
-    { src: yProtocol, dest: '@noble', amount },
-    { src: '@noble', dest: '@agoric', amount },
-    { src: '@agoric', dest: '<Cash>', amount },
+    { 
+      src: yProtocol, 
+      dest: '@noble', 
+      amount,
+      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
+        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+        value: 0n 
+      } : undefined,
+      detail: {}
+    },
+    { 
+      src: '@noble', 
+      dest: '@agoric', 
+      amount,
+      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
+        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+        value: 0n 
+      } : undefined,
+      detail: {}
+    },
+    { 
+      src: '@agoric', 
+      dest: '<Cash>', 
+      amount,
+      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
+        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+        value: 0n 
+      } : undefined,
+      detail: {}
+    },
   ];
   wallet?.makeOffer(
     {
@@ -292,6 +349,7 @@ const withdrawFromProtocol = (
   evmChain?: EVMChain,
   prevOfferId?: string,
   selectedSteps?: string[],
+  customSteps?: StepInfo[],
 ) => {
   const { wallet, offerUpInstance, purses } = useAppStore.getState();
   if (!offerUpInstance) {
@@ -365,8 +423,32 @@ const withdrawFromProtocol = (
       return;
   }
 
+  // Convert custom steps to MovementDesc format and add selected ones
+  const customMovements: MovementDesc[] = [];
+  if (customSteps && selectedSteps) {
+    customSteps.forEach(customStep => {
+      if (selectedSteps.includes(customStep.id) && customStep.movement) {
+        // Convert StepInfo movement to proper MovementDesc with correct brands
+        const movement: MovementDesc = {
+          src: customStep.movement.src,
+          dest: customStep.movement.dest,
+          amount: {
+            brand: usdcBrand as Brand<'nat'>,
+            value: customStep.movement.amount.value,
+          },
+          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
+            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
+            value: 40n 
+          } : undefined),
+          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+        };
+        customMovements.push(movement);
+      }
+    });
+  }
+
   // Filter steps based on selection if provided
-  const steps =
+  const baseSteps =
     selectedSteps && selectedSteps.length > 0
       ? allSteps.filter(step => {
           return selectedSteps.some(id => {
@@ -393,6 +475,9 @@ const withdrawFromProtocol = (
           });
         })
       : allSteps;
+
+  // Combine base steps with custom steps
+  const steps = [...baseSteps, ...customMovements];
 
   wallet?.makeOffer(
     {

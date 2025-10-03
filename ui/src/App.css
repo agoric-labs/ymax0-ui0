@@ -752,11 +752,203 @@ pre {
   border-radius: var(--radius-sm);
   background: var(--color-bg-secondary);
   transition: all var(--transition-fast);
+  cursor: grab;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
 }
 
 .step-item:hover {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-sm);
+}
+
+.step-item:active {
+  cursor: grabbing;
+}
+
+/* Drag and drop styles */
+.step-item.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+.step-item.drag-over {
+  background: var(--color-accent-light, #e3f2fd);
+  border-color: var(--color-accent, #2196f3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  padding: var(--space-sm);
+  cursor: grab;
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-icon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.step-item:hover .drag-icon {
+  opacity: 1;
+}
+
+/* Add Custom Step Styles */
+.add-step-section {
+  margin-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-md);
+}
+
+.add-step-button {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-secondary);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  transition: all var(--transition-fast);
+}
+
+.add-step-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+.add-step-icon {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.add-step-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.add-step-title {
+  margin: 0 0 var(--space-md) 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+}
+
+.add-step-inputs {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  gap: var(--space-sm);
+  align-items: end;
+  margin-bottom: var(--space-md);
+}
+
+.add-step-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.add-step-input-group label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.add-step-select,
+.add-step-input {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.add-step-select:focus,
+.add-step-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-alpha);
+}
+
+.add-step-arrow {
+  font-size: 1.2em;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.add-step-actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+.add-step-confirm,
+.add-step-cancel {
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.add-step-confirm {
+  background: var(--color-primary);
+  color: white;
+}
+
+.add-step-confirm:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.add-step-confirm:disabled {
+  background: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.add-step-cancel {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.add-step-cancel:hover {
+  background: var(--color-surface);
+  border-color: var(--color-text-secondary);
+}
+
+/* Responsive layout for add step form */
+@media (max-width: 768px) {
+  .add-step-inputs {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+  
+  .add-step-arrow {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
 }
 
 .step-item-label {
@@ -995,11 +1187,41 @@ pre {
   font-size: var(--font-size-sm);
 }
 
-.form-section {
-  max-width: 1200px;
-  margin: 0 auto;
+/* Two-column layout for tabs with steps sidebar */
+.tab-content-layout {
+  display: flex;
+  gap: var(--space-lg);
   width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+.form-section {
+  flex: 2;
+  min-width: 0;
   box-sizing: border-box;
+}
+
+.steps-sidebar {
+  flex: 1;
+  min-width: 300px;
+  max-width: 400px;
+  position: sticky;
+  top: var(--space-md);
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 1024px) {
+  .tab-content-layout {
+    flex-direction: column;
+  }
+  
+  .steps-sidebar {
+    position: static;
+    max-width: none;
+    min-width: 0;
+  }
 }
 
 .input-row {
