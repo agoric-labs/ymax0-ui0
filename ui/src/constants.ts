@@ -20,8 +20,11 @@ export const BRAND_NAMES = {
 } as const;
 
 export const CONTRACT_NAMES = {
-  YMAX: 'ymax0',
+  YMAX_DEV: 'ymax0',
+  YMAX_PROD: 'ymax1',
 } as const;
+
+export type ContractVersion = 'ymax0' | 'ymax1';
 
 export const CHAINS = {
   AGORIC_DEV: 'agoricdev-25',

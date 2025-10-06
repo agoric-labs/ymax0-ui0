@@ -4,6 +4,7 @@ import { makeVstorageKit, makeVStorage } from '@agoric/client-utils';
 import { makeAgoricChainStorageWatcher, AgoricChainStoragePathKind as Kind } from '@agoric/rpc';
 import { reifyWalletEntry } from '../walletEntryProxy';
 import type { Environment } from '../types';
+import { ContractVersion } from '../constants';
 import WalletEntriesCard from './WalletEntriesCard';
 import ContractControlCard from './ContractControlCard';
 import CreatorFacetCard from './CreatorFacetCard';
@@ -19,6 +20,7 @@ type AdminProps = {
   purses?: Array<Purse>;
   keplr?: any;
   chainId?: string;
+  contractVersion?: ContractVersion;
 };
 
 const Admin: React.FC<AdminProps> = ({
@@ -29,10 +31,11 @@ const Admin: React.FC<AdminProps> = ({
   purses,
   keplr,
   chainId,
+  contractVersion = 'ymax0',
 }) => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [instanceInfo, setInstanceInfo] = useState<{
-    ymax0?: string;
+    contract?: string;
     postalService?: string;
   } | null>(null);
   const [instanceBlockHeight, setInstanceBlockHeight] = useState<string | null>(null);
@@ -101,8 +104,8 @@ const Admin: React.FC<AdminProps> = ({
 
     try {
       // Get board ID for target confirmation
-      const ymax0Instance = instanceInfo?.ymax0 ? instances?.find(([n]) => n === 'ymax0')?.[1] : null;
-      const [boardId] = ymax0Instance ? watcherRef.current.marshaller.toCapData(ymax0Instance).slots : [''];
+      const contractInstance = instanceInfo?.contract ? instances?.find(([n]) => n === contractVersion)?.[1] : null;
+      const [boardId] = contractInstance ? watcherRef.current.marshaller.toCapData(contractInstance).slots : [''];
       
       const { target, tools } = reifyWalletEntry<{ terminate: (args?: { message?: string; target?: string }) => Promise<any> }>({
         targetName: 'ymaxControl',
@@ -377,9 +380,9 @@ const Admin: React.FC<AdminProps> = ({
           return instancePair ? String(instancePair[1]) : undefined;
         };
 
-        const ymax0 = findInstance('ymax0');
+        const contract = findInstance(contractVersion);
         const postalService = findInstance('postalService');
-        setInstanceInfo({ ymax0, postalService });
+        setInstanceInfo({ contract, postalService });
       },
     );
 
@@ -614,6 +617,7 @@ const Admin: React.FC<AdminProps> = ({
           onTerminate={handleTerminate}
           onUpgrade={handleUpgrade}
           onInstallAndStart={handleInstallAndStart}
+          contractVersion={contractVersion}
         />
 
         <CreatorFacetCard

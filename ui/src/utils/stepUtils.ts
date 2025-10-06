@@ -64,6 +64,7 @@ export const generateOpenPositionSteps = (
           dest: `@${evmChain}`,
           amount: { brand: {} as Brand<'nat'>, value: usdcAmount },
           fee: { brand: {} as Brand<'nat'>, value: 2_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
 
@@ -76,6 +77,7 @@ export const generateOpenPositionSteps = (
           dest: `${yieldProtocol}_${evmChain}`,
           amount: { brand: {} as Brand<'nat'>, value: usdcAmount },
           fee: { brand: {} as Brand<'nat'>, value: 2_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
       break;
@@ -116,6 +118,7 @@ export const generateWithdrawSteps = (
           dest: `@${evmChain}`,
           amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
           fee: { brand: {} as Brand<'nat'>, value: 15_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
 
@@ -128,6 +131,7 @@ export const generateWithdrawSteps = (
           dest: '@noble',
           amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
           fee: { brand: {} as Brand<'nat'>, value: 15_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
       break;
@@ -164,15 +168,13 @@ export const filterMovementsBySelectedSteps = (
   selectedStepIds: string[],
   allSteps: StepInfo[],
 ): MovementDesc[] => {
-  return originalMovements.filter((movement) => {
+  return originalMovements.filter(movement => {
     const correspondingStep = allSteps.find(
-      (step) =>
+      step =>
         step.movement &&
         step.movement.src === movement.src &&
         step.movement.dest === movement.dest,
     );
-    return (
-      !correspondingStep || selectedStepIds.includes(correspondingStep.id)
-    );
+    return !correspondingStep || selectedStepIds.includes(correspondingStep.id);
   });
 };

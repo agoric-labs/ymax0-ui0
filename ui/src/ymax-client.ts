@@ -79,12 +79,14 @@ export const makePortfolioSteps = <
           dest: `@${evm}`,
           amount,
           fee: fees[p].Account,
+          detail: { evmGas: 200_000_000_000_000n },
         });
         steps.push({
           src: `@${evm}`,
           dest: `${p}_${evm}`,
           amount,
           fee: fees[p].Call,
+          detail: { evmGas: 200_000_000_000_000n },
         });
         break;
       default:

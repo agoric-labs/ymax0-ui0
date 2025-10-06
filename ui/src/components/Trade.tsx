@@ -14,8 +14,11 @@ import {
   fetchAllTransactions,
   PendingTransaction,
 } from '../utils/walletUtils';
+import { ContractVersion } from '../constants';
 
 type TradeProps = {
+  contractVersion: ContractVersion;
+  onContractVersionChange: (version: ContractVersion) => void;
   makeOffer: (
     usdcAmount: bigint,
     bldFeeAmount: bigint,
@@ -52,6 +55,8 @@ type TradeProps = {
 
 // Simplified Trade component with customizable USDC and BLD fee amounts
 const Trade = ({
+  contractVersion,
+  onContractVersionChange,
   makeOffer,
   withdrawUSDC,
   withdrawFromProtocol,
@@ -197,27 +202,27 @@ const Trade = ({
   // Fetch transactions only once when watcher becomes available
   useEffect(() => {
     let isCancelled = false;
-    
+
     const fetchTransactions = async () => {
       if (watcher && !isLoadingTransactions && !isCancelled && allTransactions.length === 0) {
         console.log('Loading transactions from blockchain...');
         setIsLoadingTransactions(true);
         try {
-          const transactions = await fetchAllTransactions(watcher);
-          
+          const transactions = await fetchAllTransactions(watcher, contractVersion);
+
           if (isCancelled) {
             return;
           }
-          
+
           console.log(`Loaded ${transactions.length} transactions from blockchain`);
           setAllTransactions(transactions);
-          
+
           // Filter based on checkbox state
-          const filteredTransactions = showOnlyPending 
+          const filteredTransactions = showOnlyPending
             ? transactions.filter(tx => tx.status === 'pending')
             : transactions;
           setPendingTransactions(filteredTransactions);
-          
+
           // If we have transactions and no txId is set, set the first one
           if (filteredTransactions.length > 0 && !txId) {
             setTxId(filteredTransactions[0].id);
@@ -238,13 +243,13 @@ const Trade = ({
     // Add a delay to ensure watcher is ready, but only run once
     if (watcher && allTransactions.length === 0) {
       const timeoutId = setTimeout(fetchTransactions, 2000);
-      
+
       return () => {
         isCancelled = true;
         clearTimeout(timeoutId);
       };
     }
-  }, [watcher]); // Only depend on watcher
+  }, [watcher, contractVersion]); // Also depend on contractVersion
   
   // Filter transactions when checkbox state changes
   useEffect(() => {
@@ -324,12 +329,12 @@ const Trade = ({
       setIsLoadingTransactions(true);
       try {
         console.log('Refreshing transactions from blockchain...');
-        const transactions = await fetchAllTransactions(watcher);
+        const transactions = await fetchAllTransactions(watcher, contractVersion);
         console.log(`Refreshed ${transactions.length} transactions`);
         setAllTransactions(transactions);
-        
+
         // Filter based on current checkbox state
-        const filteredTransactions = showOnlyPending 
+        const filteredTransactions = showOnlyPending
           ? transactions.filter(tx => tx.status === 'pending')
           : transactions;
         setPendingTransactions(filteredTransactions);
@@ -352,11 +357,11 @@ const Trade = ({
 
     console.log('=== TESTING VSTORAGE PATHS ===');
     const testPaths = [
-      { path: 'published.ymax0.pendingTxs', kind: Kind.Children },
-      { path: 'published.ymax0.pendingTxs', kind: Kind.Data },
-      { path: 'published.ymax0', kind: Kind.Data },
-      { path: 'published.ymax0.pendingTxs.tx0', kind: Kind.Data },
-      { path: 'published.ymax0.transactions', kind: Kind.Children },
+      { path: `published.${contractVersion}.pendingTxs`, kind: Kind.Children },
+      { path: `published.${contractVersion}.pendingTxs`, kind: Kind.Data },
+      { path: `published.${contractVersion}`, kind: Kind.Data },
+      { path: `published.${contractVersion}.pendingTxs.tx0`, kind: Kind.Data },
+      { path: `published.${contractVersion}.transactions`, kind: Kind.Children },
     ];
 
     for (const testPath of testPaths) {
@@ -955,7 +960,7 @@ const Trade = ({
           {pendingTransactions.length === 0 && !isLoadingTransactions && (
             <div className="transaction-status">
               <p><strong>Status:</strong> No pending transactions found in blockchain storage.</p>
-              <p><small>The vstorage path <code>published.ymax0.pendingTxs</code> exists but contains no data yet.</small></p>
+              <p><small>The vstorage path <code>published.{contractVersion}.pendingTxs</code> exists but contains no data yet.</small></p>
             </div>
           )}
 
@@ -1033,8 +1038,27 @@ const Trade = ({
   return (
     <div className="trade-container">
       <div className="page-header">
-        <h1>ymax-dev-ui</h1>
-        <p className="page-subtitle">Yield Maximization Protocol Interface</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div>
+            <h1>ymax-dev-ui</h1>
+            <p className="page-subtitle">Yield Maximization Protocol Interface</p>
+          </div>
+          <div className="contract-version-selector">
+            <label htmlFor="contract-version" style={{ marginRight: '10px', fontWeight: 'bold' }}>
+              Contract:
+            </label>
+            <select
+              id="contract-version"
+              value={contractVersion}
+              onChange={(e) => onContractVersionChange(e.target.value as ContractVersion)}
+              className="chain-selector"
+              style={{ minWidth: '120px' }}
+            >
+              <option value="ymax0">ymax0 (Dev)</option>
+              <option value="ymax1">ymax1 (Prod)</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <Tabs tabs={tabs} defaultTab="open-position" />

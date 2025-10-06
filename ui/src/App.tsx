@@ -28,6 +28,7 @@ import type {
 import type { Brand } from '@agoric/ertp/src/types.js';
 import { getBrand } from './utils';
 import { getInitialEnvironment, configureEndpoints } from './config';
+import { ContractVersion } from './constants';
 
 const { fromEntries } = Object;
 
@@ -36,14 +37,16 @@ let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
 const useAppStore = create<AppState>(() => ({}) as AppState);
 
-const setup = async () => {
+const setup = async (contractVersion: ContractVersion) => {
   watcher.watchLatest<Array<[string, unknown]>>(
     [Kind.Data, 'published.agoricNames.instance'],
     instances => {
       console.log('got instances', instances);
       useAppStore.setState({
         instances,
-        offerUpInstance: instances.find(([name]) => name === 'ymax0')!.at(1),
+        offerUpInstance: instances
+          .find(([name]) => name === contractVersion)!
+          .at(1),
       });
     },
   );
@@ -153,11 +156,20 @@ const makeOffer = (
             brand: usdcBrand as Brand<'nat'>,
             value: customStep.movement.amount.value,
           },
-          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
-            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-            value: 40n 
-          } : undefined),
-          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+          fee:
+            customStep.movement.fee ||
+            (getBrand(useAppStore.getState().purses, 'BLD')
+              ? {
+                  brand: getBrand(
+                    useAppStore.getState().purses,
+                    'BLD',
+                  ) as Brand<'nat'>,
+                  value: 40n,
+                }
+              : undefined),
+          detail: customStep.movement.detail || {
+            evmGas: 200_000_000_000_000n,
+          },
         };
         customMovements.push(movement);
       }
@@ -195,12 +207,18 @@ const makeOffer = (
   // Combine base steps with custom steps
   const steps = [...baseSteps, ...customMovements];
 
+  // Build proposal: Access + Deposit (NOT GmpFee - contract handles fees internally)
+  const proposalGive = {
+    Access: { brand: poc26Brand, value: 1n },
+    Deposit: give.Deposit,
+  };
+
   console.log('Making offer with:', {
     instance: offerUpInstance,
-    give: {
-      ...give,
-      Access: { brand: poc26Brand, value: 1n },
-    },
+    proposal: { give: proposalGive },
+    offerArgs: { flow: steps },
+    stepsCount: steps.length,
+    note: 'GmpFee not in proposal - contract handles fees internally via flow',
   });
 
   // Generate a unique offerId
@@ -215,10 +233,7 @@ const makeOffer = (
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
     {
-      give: {
-        ...give,
-        Access: { brand: poc26Brand, value: 1n },
-      },
+      give: proposalGive,
     },
     { flow: steps },
     (update: { status: string; data?: unknown }) => {
@@ -278,35 +293,50 @@ const withdrawUSDC = () => {
   const { yProtocol = 'USDN' } = useAppStore.getState();
 
   const steps: MovementDesc[] = [
-    { 
-      src: yProtocol, 
-      dest: '@noble', 
+    {
+      src: yProtocol,
+      dest: '@noble',
       amount,
-      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
-        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-        value: 0n 
-      } : undefined,
-      detail: {}
+      fee: getBrand(useAppStore.getState().purses, 'BLD')
+        ? {
+            brand: getBrand(
+              useAppStore.getState().purses,
+              'BLD',
+            ) as Brand<'nat'>,
+            value: 0n,
+          }
+        : undefined,
+      detail: {},
     },
-    { 
-      src: '@noble', 
-      dest: '@agoric', 
+    {
+      src: '@noble',
+      dest: '@agoric',
       amount,
-      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
-        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-        value: 0n 
-      } : undefined,
-      detail: {}
+      fee: getBrand(useAppStore.getState().purses, 'BLD')
+        ? {
+            brand: getBrand(
+              useAppStore.getState().purses,
+              'BLD',
+            ) as Brand<'nat'>,
+            value: 0n,
+          }
+        : undefined,
+      detail: {},
     },
-    { 
-      src: '@agoric', 
-      dest: '<Cash>', 
+    {
+      src: '@agoric',
+      dest: '<Cash>',
       amount,
-      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
-        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-        value: 0n 
-      } : undefined,
-      detail: {}
+      fee: getBrand(useAppStore.getState().purses, 'BLD')
+        ? {
+            brand: getBrand(
+              useAppStore.getState().purses,
+              'BLD',
+            ) as Brand<'nat'>,
+            value: 0n,
+          }
+        : undefined,
+      detail: {},
     },
   ];
   wallet?.makeOffer(
@@ -412,6 +442,7 @@ const withdrawFromProtocol = (
           dest: `@${chain}`,
           amount,
           fee: defaultFee,
+          detail: { evmGas: 200_000_000_000_000n },
         },
         { src: `@${chain}`, dest: '@noble', amount, fee: defaultFee },
         { src: '@noble', dest: '@agoric', amount },
@@ -436,11 +467,20 @@ const withdrawFromProtocol = (
             brand: usdcBrand as Brand<'nat'>,
             value: customStep.movement.amount.value,
           },
-          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
-            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-            value: 40n 
-          } : undefined),
-          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+          fee:
+            customStep.movement.fee ||
+            (getBrand(useAppStore.getState().purses, 'BLD')
+              ? {
+                  brand: getBrand(
+                    useAppStore.getState().purses,
+                    'BLD',
+                  ) as Brand<'nat'>,
+                  value: 40n,
+                }
+              : undefined),
+          detail: customStep.movement.detail || {
+            evmGas: 200_000_000_000_000n,
+          },
         };
         customMovements.push(movement);
       }
@@ -741,6 +781,9 @@ const MainPage = () => {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
+  const [contractVersion, setContractVersion] = useState<ContractVersion>(
+    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax0',
+  );
 
   const { wallet, purses, offerId } = useAppStore((state: AppState) => ({
     wallet: state.wallet,
@@ -767,6 +810,22 @@ const MainPage = () => {
       alert(
         'Environment changed. Please refresh the page to reconnect the wallet with the new environment.',
       );
+    }
+  };
+
+  const handleContractVersionChange = (newVersion: ContractVersion) => {
+    setContractVersion(newVersion);
+    localStorage.setItem('contractVersion', newVersion);
+
+    // Re-run setup to update the contract instance
+    setup(newVersion);
+
+    // If wallet was connected, notify user
+    if (wallet) {
+      alert(
+        `Contract version changed to ${newVersion}. The page will reload to apply changes.`,
+      );
+      window.location.reload();
     }
   };
 
@@ -816,6 +875,8 @@ const MainPage = () => {
         <div className="main-content">
           <div className="card">
             <Trade
+              contractVersion={contractVersion}
+              onContractVersionChange={handleContractVersionChange}
               makeOffer={(
                 usdcAmount,
                 bldFeeAmount,
@@ -866,9 +927,13 @@ const MainPage = () => {
 };
 
 function App() {
+  const [contractVersion] = useState<ContractVersion>(
+    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax0',
+  );
+
   useEffect(() => {
-    setup();
-  }, []);
+    setup(contractVersion);
+  }, [contractVersion]);
 
   const { wallet, instances, purses } = useAppStore((state: AppState) => ({
     wallet: state.wallet,
@@ -890,6 +955,7 @@ function App() {
             purses={purses}
             keplr={(window as any).keplr}
             chainId={ENDPOINTS.CHAIN_ID}
+            contractVersion={contractVersion}
           />
         }
       />
