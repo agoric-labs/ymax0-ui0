@@ -651,7 +651,7 @@ export const fetchAllTransactions = async (
 export const testVstoragePath = async (
   watcher: ReturnType<typeof makeAgoricChainStorageWatcher>,
   walletAddress: string,
-  contractVersion: ContractVersion = 'ymax0',
+  contractVersion: ContractVersion = 'ymax1',
 ): Promise<void> => {
   console.log('=== TESTING VSTORAGE PATHS ===');
   console.log('Wallet address:', walletAddress);

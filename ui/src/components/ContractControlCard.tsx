@@ -21,7 +21,7 @@ interface ContractControlCardProps {
 
 const ContractControlCard: React.FC<ContractControlCardProps> = ({
   instanceInfo,
-  contractVersion = 'ymax0',
+  contractVersion = 'ymax1',
   instanceBlockHeight,
   creatorFacetName,
   setCreatorFacetName,

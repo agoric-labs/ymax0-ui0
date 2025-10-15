@@ -31,7 +31,7 @@ const Admin: React.FC<AdminProps> = ({
   purses,
   keplr,
   chainId,
-  contractVersion = 'ymax0',
+  contractVersion: initialContractVersion = 'ymax1',
 }) => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [instanceInfo, setInstanceInfo] = useState<{
@@ -45,6 +45,7 @@ const Admin: React.FC<AdminProps> = ({
   const [creatorFacetName, setCreatorFacetName] = useState<string>('creatorFacet');
   const [plannerAddress, setPlannerAddress] = useState<string>('');
   const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
+  const [contractVersion, setContractVersion] = useState<ContractVersion>(initialContractVersion);
   const [ENDPOINTS, setENDPOINTS] = useState(configureEndpoints(getInitialEnvironment()));
   const watcherRef = useRef<ReturnType<typeof makeAgoricChainStorageWatcher> | null>(null);
   
@@ -361,6 +362,16 @@ const Admin: React.FC<AdminProps> = ({
     }
   };
 
+  const handleContractVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newVersion = e.target.value as ContractVersion;
+    setContractVersion(newVersion);
+    localStorage.setItem('contractVersion', newVersion);
+
+    // Clear instance info when switching contract versions - useEffect will refetch
+    setInstanceInfo(null);
+    setInstanceBlockHeight(null);
+  };
+
   // Initialize watcher and vstorage client
   useEffect(() => {
     const watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
@@ -403,7 +414,7 @@ const Admin: React.FC<AdminProps> = ({
       // Cleanup watcher if needed
       watcherRef.current = null;
     };
-  }, [ENDPOINTS]);
+  }, [ENDPOINTS, contractVersion]);
 
   // Watch wallet state for invitations, track pending entries, and get saved entries
   useEffect(() => {
@@ -570,18 +581,35 @@ const Admin: React.FC<AdminProps> = ({
       `}</style>
       <div style={{ position: 'relative', marginBottom: '1rem' }}>
         <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
-        
-        <div className="environment-selector" style={{ position: 'absolute', top: 0, right: 0 }}>
-          <label htmlFor="environment-select">Env: </label>
-          <select
-            id="environment-select"
-            value={environment}
-            onChange={handleEnvironmentChange}
-          >
-            <option value="mainnet">Mainnet</option>
-            <option value="devnet">Devnet</option>
-            <option value="localhost">Localhost</option>
-          </select>
+
+        <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+          <div className="contract-version-selector">
+            <label htmlFor="contract-version-select" style={{ marginRight: '0.5rem' }}>Contract: </label>
+            <select
+              id="contract-version-select"
+              value={contractVersion}
+              onChange={handleContractVersionChange}
+              style={{ padding: '0.25rem' }}
+            >
+              <option value="ymax1">ymax1 (Prod)</option>
+              <option value="ymax0">ymax0 (Dev)</option>
+            </select>
+          </div>
+
+          <div className="environment-selector">
+            <label htmlFor="environment-select" style={{ marginRight: '0.5rem' }}>Env: </label>
+            <select
+              id="environment-select"
+              value={environment}
+              onChange={handleEnvironmentChange}
+              style={{ padding: '0.25rem' }}
+            >
+              <option value="mainnet">Mainnet</option>
+              <option value="devnet">Devnet</option>
+              <option value="localhost">Localhost</option>
+            </select>
+          </div>
+
           <div className="environment-info">
             <small>
               RPC: {ENDPOINTS.RPC}

@@ -3,8 +3,61 @@ import { Fail } from '@endo/errors';
 import { objectMap } from '@endo/patterns';
 type NatAmount = { brand: Brand<'nat'>; value: bigint }; // XXX from ERTP
 
-export type YieldProtocol = 'USDN' | 'Aave' | 'Compound';
-export type EVMChain = 'Avalanche' | 'Arbitrum' | 'Ethereum' | 'Base'; // XXX etc.
+export type YieldProtocol =
+  | 'USDN'
+  | 'Aave'
+  | 'Compound'
+  | 'Beefy'
+  | 'Beefy_re7'
+  | 'Beefy_compoundUsdc_Arbitrum'
+  | 'Beefy_compoundUsdc_Optimism'
+  | 'Beefy_morphoGauntletUsdc'
+  | 'Beefy_morphoSmokehouseUsdc'
+  | 'Beefy_morphoSeamlessUsdc';
+
+export type EVMChain = 'Avalanche' | 'Arbitrum' | 'Ethereum' | 'Base' | 'Optimism'; // XXX etc.
+
+// Beefy vault names are specific to each chain and vault type
+const beefyVaultNames: Record<EVMChain, string> = {
+  Avalanche: 'Beefy_re7_Avalanche',
+  Arbitrum: 'Beefy_compoundUsdc_Arbitrum',
+  Ethereum: 'Beefy_morphoGauntletUsdc_Ethereum', // Default to morphoGauntlet, could also be morphoSmokehouse
+  Base: 'Beefy_morphoSeamlessUsdc_Base',
+  Optimism: 'Beefy_compoundUsdc_Optimism',
+};
+
+// Map from Beefy protocol to full vault name
+export const beefyProtocolToVault: Record<string, string> = {
+  'Beefy_re7': 'Beefy_re7_Avalanche',
+  'Beefy_compoundUsdc_Arbitrum': 'Beefy_compoundUsdc_Arbitrum',
+  'Beefy_compoundUsdc_Optimism': 'Beefy_compoundUsdc_Optimism',
+  'Beefy_morphoGauntletUsdc': 'Beefy_morphoGauntletUsdc_Ethereum',
+  'Beefy_morphoSmokehouseUsdc': 'Beefy_morphoSmokehouseUsdc_Ethereum',
+  'Beefy_morphoSeamlessUsdc': 'Beefy_morphoSeamlessUsdc_Base',
+};
+
+// Map from Beefy protocol to chain
+export const beefyProtocolToChain: Record<string, EVMChain> = {
+  'Beefy_re7': 'Avalanche',
+  'Beefy_compoundUsdc_Arbitrum': 'Arbitrum',
+  'Beefy_compoundUsdc_Optimism': 'Optimism',
+  'Beefy_morphoGauntletUsdc': 'Ethereum',
+  'Beefy_morphoSmokehouseUsdc': 'Ethereum',
+  'Beefy_morphoSeamlessUsdc': 'Base',
+};
+
+// Get the full vault name from protocol
+export const getBeefyVaultName = (protocol: YieldProtocol): string => {
+  if (protocol.startsWith('Beefy_')) {
+    return beefyProtocolToVault[protocol] || protocol;
+  }
+  return protocol;
+};
+
+// Check if protocol is a Beefy vault
+export const isBeefyProtocol = (protocol: YieldProtocol): boolean => {
+  return protocol.startsWith('Beefy_');
+};
 
 const { entries, values } = Object;
 const { add, make } = AmountMath;
@@ -84,6 +137,23 @@ export const makePortfolioSteps = <
         steps.push({
           src: `@${evm}`,
           dest: `${p}_${evm}`,
+          amount,
+          fee: fees[p].Call,
+          detail: { evmGas: 200_000_000_000_000n },
+        });
+        break;
+      case 'Beefy':
+        // Beefy uses specific vault names per chain
+        steps.push({
+          src: '@noble',
+          dest: `@${evm}`,
+          amount,
+          fee: fees[p].Account,
+          detail: { evmGas: 200_000_000_000_000n },
+        });
+        steps.push({
+          src: `@${evm}`,
+          dest: beefyVaultNames[evm],
           amount,
           fee: fees[p].Call,
           detail: { evmGas: 200_000_000_000_000n },

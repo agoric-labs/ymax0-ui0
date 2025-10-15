@@ -430,9 +430,9 @@ const Trade = ({
         ? 0n
         : BigInt(Math.floor(parseFloat(bldFeeAmount.trim()) * 1_000_000));
 
-    // Only pass the EVM chain if Aave or Compound is selected
+    // Only pass the EVM chain if Aave, Compound, or Beefy is selected
     const evmChainParam =
-      yieldProtocol === 'Aave' || yieldProtocol === 'Compound'
+      yieldProtocol === 'Aave' || yieldProtocol === 'Compound' || yieldProtocol === 'Beefy'
         ? evmChain
         : undefined;
 
@@ -473,7 +473,7 @@ const Trade = ({
       Math.floor(parseFloat(withdrawAmount.trim()) * 1_000_000),
     );
 
-    // Only pass the EVM chain if Aave or Compound is selected
+    // Only pass the EVM chain if Aave or Compound is selected (Beefy vaults have chain embedded)
     const evmChainParam =
       withdrawFromProtocolState === 'Aave' ||
       withdrawFromProtocolState === 'Compound'
@@ -572,12 +572,13 @@ const Trade = ({
                 <option value="USDN">USDN</option>
                 <option value="Aave">Aave</option>
                 <option value="Compound">Compound</option>
+                <option value="Beefy">Beefy</option>
               </select>
             </div>
           </div>
 
-          {/* EVM Chain Selector - only visible when Aave or Compound is selected */}
-          {(yieldProtocol === 'Aave' || yieldProtocol === 'Compound') && (
+          {/* EVM Chain Selector - only visible when Aave, Compound, or Beefy is selected */}
+          {(yieldProtocol === 'Aave' || yieldProtocol === 'Compound' || yieldProtocol === 'Beefy') && (
             <div className="input-row">
               <div className="input-group">
                 <label htmlFor="evm-chain">EVM Chain:</label>
@@ -591,6 +592,7 @@ const Trade = ({
                   <option value="Arbitrum">Arbitrum</option>
                   <option value="Ethereum">Ethereum</option>
                   <option value="Base">Base</option>
+                  <option value="Optimism">Optimism</option>
                 </select>
               </div>
             </div>
@@ -742,11 +744,17 @@ const Trade = ({
                 <option value="USDN">USDN</option>
                 <option value="Aave">Aave</option>
                 <option value="Compound">Compound</option>
+                <option value="Beefy_re7">Beefy re7 (Avalanche)</option>
+                <option value="Beefy_compoundUsdc_Arbitrum">Beefy compoundUsdc (Arbitrum)</option>
+                <option value="Beefy_compoundUsdc_Optimism">Beefy compoundUsdc (Optimism)</option>
+                <option value="Beefy_morphoGauntletUsdc">Beefy morphoGauntletUsdc (Ethereum)</option>
+                <option value="Beefy_morphoSmokehouseUsdc">Beefy morphoSmokehouseUsdc (Ethereum)</option>
+                <option value="Beefy_morphoSeamlessUsdc">Beefy morphoSeamlessUsdc (Base)</option>
               </select>
             </div>
           </div>
 
-          {/* EVM Chain Selector - only visible when Aave or Compound is selected */}
+          {/* EVM Chain Selector - only visible when Aave or Compound is selected (not for specific Beefy vaults) */}
           {(withdrawFromProtocolState === 'Aave' ||
             withdrawFromProtocolState === 'Compound') && (
             <div className="input-row">
@@ -762,6 +770,7 @@ const Trade = ({
                   <option value="Arbitrum">Arbitrum</option>
                   <option value="Ethereum">Ethereum</option>
                   <option value="Base">Base</option>
+                  <option value="Optimism">Optimism</option>
                 </select>
               </div>
             </div>
@@ -1054,8 +1063,8 @@ const Trade = ({
               className="chain-selector"
               style={{ minWidth: '120px' }}
             >
-              <option value="ymax0">ymax0 (Dev)</option>
               <option value="ymax1">ymax1 (Prod)</option>
+              <option value="ymax0">ymax0 (Dev)</option>
             </select>
           </div>
         </div>

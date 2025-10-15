@@ -16,7 +16,7 @@ import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
-import { makePortfolioSteps } from './ymax-client.ts';
+import { makePortfolioSteps, beefyProtocolToVault, beefyProtocolToChain, isBeefyProtocol } from './ymax-client.ts';
 import { StepInfo } from './components/StepSelector';
 import type {
   Environment,
@@ -424,6 +424,13 @@ const withdrawFromProtocol = (
   // Default fee amount (2 BLD = 2,000,000 micro-BLD)
   const defaultFee = { brand: bldBrand as Brand<'nat'>, value: 15_000_000n };
 
+  console.log('[withdrawFromProtocol] Parameters:', {
+    fromProtocol,
+    evmChain,
+    selectedSteps,
+    customSteps: customSteps?.length || 0,
+  });
+
   // Create withdrawal steps based on protocol
   switch (fromProtocol) {
     case 'USDN':
@@ -444,12 +451,46 @@ const withdrawFromProtocol = (
           fee: defaultFee,
           detail: { evmGas: 200_000_000_000_000n },
         },
-        { src: `@${chain}`, dest: '@noble', amount, fee: defaultFee },
-        { src: '@noble', dest: '@agoric', amount },
+        { src: `@${chain}`, dest: '@agoric', amount, fee: defaultFee },
         { src: '@agoric', dest: '<Cash>', amount },
       );
       break;
+    case 'Beefy':
+      const beefyChain = evmChain || 'Avalanche';
+      console.log('[Beefy withdrawal] Creating steps with chain:', beefyChain, 'vault:', beefyVaultNames[beefyChain]);
+      allSteps.push(
+        {
+          src: beefyVaultNames[beefyChain],
+          dest: `@${beefyChain}`,
+          amount,
+          fee: defaultFee,
+          detail: { evmGas: 200_000_000_000_000n },
+        },
+        { src: `@${beefyChain}`, dest: '@agoric', amount, fee: defaultFee },
+        { src: '@agoric', dest: '<Cash>', amount },
+      );
+      console.log('[Beefy withdrawal] allSteps created:', allSteps.length, 'steps');
+      break;
     default:
+      // Handle specific Beefy vaults
+      if (isBeefyProtocol(fromProtocol)) {
+        const vaultName = beefyProtocolToVault[fromProtocol];
+        const vaultChain = beefyProtocolToChain[fromProtocol];
+        console.log('[Specific Beefy vault withdrawal] Creating steps for vault:', vaultName, 'chain:', vaultChain);
+        allSteps.push(
+          {
+            src: vaultName,
+            dest: `@${vaultChain}`,
+            amount,
+            fee: defaultFee,
+            detail: { evmGas: 200_000_000_000_000n },
+          },
+          { src: `@${vaultChain}`, dest: '@agoric', amount, fee: defaultFee },
+          { src: '@agoric', dest: '<Cash>', amount },
+        );
+        console.log('[Specific Beefy vault withdrawal] allSteps created:', allSteps.length, 'steps');
+        break;
+      }
       alert(`Unsupported protocol: ${fromProtocol}`);
       return;
   }
@@ -488,33 +529,81 @@ const withdrawFromProtocol = (
   }
 
   // Filter steps based on selection if provided
+  console.log('[withdrawFromProtocol] Filtering. selectedSteps:', selectedSteps, 'allSteps count:', allSteps.length);
   const baseSteps =
     selectedSteps && selectedSteps.length > 0
       ? allSteps.filter(step => {
-          return selectedSteps.some(id => {
+          // Map each step to potential matching IDs
+          const stepMatchesId = (id: string) => {
+            const chain = evmChain || 'Avalanche';
+            let matches = false;
             switch (id) {
               case 'usdn-to-noble':
-                return step.src === 'USDNVault' && step.dest === '@noble';
+                matches = step.src === 'USDNVault' && step.dest === '@noble';
+                break;
               case `${fromProtocol.toLowerCase()}-to-evm`:
-                return (
-                  step.src === `${fromProtocol}_${evmChain || 'Avalanche'}` &&
-                  step.dest === `@${evmChain || 'Avalanche'}`
-                );
+                if (fromProtocol === 'Beefy') {
+                  matches = false; // Beefy uses 'beefy-to-evm' id
+                } else {
+                  matches = (
+                    step.src === `${fromProtocol}_${chain}` &&
+                    step.dest === `@${chain}`
+                  );
+                }
+                break;
+              case 'beefy-to-evm':
+                // Check if it's a specific Beefy vault
+                if (isBeefyProtocol(fromProtocol)) {
+                  const vaultName = beefyProtocolToVault[fromProtocol];
+                  const vaultChain = beefyProtocolToChain[fromProtocol];
+                  matches = (
+                    step.src === vaultName &&
+                    step.dest === `@${vaultChain}`
+                  );
+                  console.log(`[Filter] Checking 'beefy-to-evm' for specific vault:`, step.src, '===', vaultName, '&&', step.dest, '=== @' + vaultChain, '→', matches);
+                } else {
+                  // Legacy Beefy support
+                  matches = (
+                    step.src === beefyVaultNames[chain] &&
+                    step.dest === `@${chain}`
+                  );
+                  console.log(`[Filter] Checking 'beefy-to-evm' for step:`, step.src, '===', beefyVaultNames[chain], '&&', step.dest, '=== @' + chain, '→', matches);
+                }
+                break;
               case 'evm-to-noble':
-                return (
-                  step.src === `@${evmChain || 'Avalanche'}` &&
+                // Legacy support for old step structure
+                matches = (
+                  step.src === `@${chain}` &&
                   step.dest === '@noble'
                 );
+                break;
+              case 'evm-to-agoric':
+                matches = (
+                  step.src === `@${chain}` &&
+                  step.dest === '@agoric'
+                );
+                break;
               case 'noble-to-agoric':
-                return step.src === '@noble' && step.dest === '@agoric';
+                matches = step.src === '@noble' && step.dest === '@agoric';
+                break;
               case 'receive-cash':
-                return step.src === '@agoric' && step.dest === '<Cash>';
+                matches = step.src === '@agoric' && step.dest === '<Cash>';
+                break;
               default:
-                return false;
+                matches = false;
             }
-          });
+            return matches;
+          };
+
+          const matched = selectedSteps.some(stepMatchesId);
+          if (!matched) {
+            console.log('[Filter] Step NOT matched:', step.src, '→', step.dest);
+          }
+          return matched;
         })
       : allSteps;
+
+  console.log('[withdrawFromProtocol] After filtering. baseSteps count:', baseSteps.length);
 
   // Combine base steps with custom steps
   const steps = [...baseSteps, ...customMovements];
@@ -782,7 +871,7 @@ const MainPage = () => {
     getInitialEnvironment(),
   );
   const [contractVersion, setContractVersion] = useState<ContractVersion>(
-    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax0',
+    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax1',
   );
 
   const { wallet, purses, offerId } = useAppStore((state: AppState) => ({
@@ -928,7 +1017,7 @@ const MainPage = () => {
 
 function App() {
   const [contractVersion] = useState<ContractVersion>(
-    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax0',
+    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax1',
   );
 
   useEffect(() => {
