@@ -16,7 +16,7 @@ import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
-import { makePortfolioSteps } from './ymax-client.ts';
+import { makePortfolioSteps, beefyProtocolToVault, beefyProtocolToChain, isBeefyProtocol } from './ymax-client.ts';
 import { StepInfo } from './components/StepSelector';
 import type {
   Environment,
@@ -28,6 +28,7 @@ import type {
 import type { Brand } from '@agoric/ertp/src/types.js';
 import { getBrand } from './utils';
 import { getInitialEnvironment, configureEndpoints } from './config';
+import { ContractVersion } from './constants';
 
 const { fromEntries } = Object;
 
@@ -36,14 +37,16 @@ let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
 const useAppStore = create<AppState>(() => ({}) as AppState);
 
-const setup = async () => {
+const setup = async (contractVersion: ContractVersion) => {
   watcher.watchLatest<Array<[string, unknown]>>(
     [Kind.Data, 'published.agoricNames.instance'],
     instances => {
       console.log('got instances', instances);
       useAppStore.setState({
         instances,
-        offerUpInstance: instances.find(([name]) => name === 'ymax0')!.at(1),
+        offerUpInstance: instances
+          .find(([name]) => name === contractVersion)!
+          .at(1),
       });
     },
   );
@@ -153,11 +156,20 @@ const makeOffer = (
             brand: usdcBrand as Brand<'nat'>,
             value: customStep.movement.amount.value,
           },
-          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
-            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-            value: 40n 
-          } : undefined),
-          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+          fee:
+            customStep.movement.fee ||
+            (getBrand(useAppStore.getState().purses, 'BLD')
+              ? {
+                  brand: getBrand(
+                    useAppStore.getState().purses,
+                    'BLD',
+                  ) as Brand<'nat'>,
+                  value: 40n,
+                }
+              : undefined),
+          detail: customStep.movement.detail || {
+            evmGas: 200_000_000_000_000n,
+          },
         };
         customMovements.push(movement);
       }
@@ -195,12 +207,18 @@ const makeOffer = (
   // Combine base steps with custom steps
   const steps = [...baseSteps, ...customMovements];
 
+  // Build proposal: Access + Deposit (NOT GmpFee - contract handles fees internally)
+  const proposalGive = {
+    Access: { brand: poc26Brand, value: 1n },
+    Deposit: give.Deposit,
+  };
+
   console.log('Making offer with:', {
     instance: offerUpInstance,
-    give: {
-      ...give,
-      Access: { brand: poc26Brand, value: 1n },
-    },
+    proposal: { give: proposalGive },
+    offerArgs: { flow: steps },
+    stepsCount: steps.length,
+    note: 'GmpFee not in proposal - contract handles fees internally via flow',
   });
 
   // Generate a unique offerId
@@ -215,10 +233,7 @@ const makeOffer = (
       publicInvitationMaker: 'makeOpenPortfolioInvitation',
     },
     {
-      give: {
-        ...give,
-        Access: { brand: poc26Brand, value: 1n },
-      },
+      give: proposalGive,
     },
     { flow: steps },
     (update: { status: string; data?: unknown }) => {
@@ -278,35 +293,50 @@ const withdrawUSDC = () => {
   const { yProtocol = 'USDN' } = useAppStore.getState();
 
   const steps: MovementDesc[] = [
-    { 
-      src: yProtocol, 
-      dest: '@noble', 
+    {
+      src: yProtocol,
+      dest: '@noble',
       amount,
-      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
-        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-        value: 0n 
-      } : undefined,
-      detail: {}
+      fee: getBrand(useAppStore.getState().purses, 'BLD')
+        ? {
+            brand: getBrand(
+              useAppStore.getState().purses,
+              'BLD',
+            ) as Brand<'nat'>,
+            value: 0n,
+          }
+        : undefined,
+      detail: {},
     },
-    { 
-      src: '@noble', 
-      dest: '@agoric', 
+    {
+      src: '@noble',
+      dest: '@agoric',
       amount,
-      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
-        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-        value: 0n 
-      } : undefined,
-      detail: {}
+      fee: getBrand(useAppStore.getState().purses, 'BLD')
+        ? {
+            brand: getBrand(
+              useAppStore.getState().purses,
+              'BLD',
+            ) as Brand<'nat'>,
+            value: 0n,
+          }
+        : undefined,
+      detail: {},
     },
-    { 
-      src: '@agoric', 
-      dest: '<Cash>', 
+    {
+      src: '@agoric',
+      dest: '<Cash>',
       amount,
-      fee: getBrand(useAppStore.getState().purses, 'BLD') ? { 
-        brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-        value: 0n 
-      } : undefined,
-      detail: {}
+      fee: getBrand(useAppStore.getState().purses, 'BLD')
+        ? {
+            brand: getBrand(
+              useAppStore.getState().purses,
+              'BLD',
+            ) as Brand<'nat'>,
+            value: 0n,
+          }
+        : undefined,
+      detail: {},
     },
   ];
   wallet?.makeOffer(
@@ -394,6 +424,13 @@ const withdrawFromProtocol = (
   // Default fee amount (2 BLD = 2,000,000 micro-BLD)
   const defaultFee = { brand: bldBrand as Brand<'nat'>, value: 15_000_000n };
 
+  console.log('[withdrawFromProtocol] Parameters:', {
+    fromProtocol,
+    evmChain,
+    selectedSteps,
+    customSteps: customSteps?.length || 0,
+  });
+
   // Create withdrawal steps based on protocol
   switch (fromProtocol) {
     case 'USDN':
@@ -412,13 +449,48 @@ const withdrawFromProtocol = (
           dest: `@${chain}`,
           amount,
           fee: defaultFee,
+          detail: { evmGas: 200_000_000_000_000n },
         },
-        { src: `@${chain}`, dest: '@noble', amount, fee: defaultFee },
-        { src: '@noble', dest: '@agoric', amount },
+        { src: `@${chain}`, dest: '@agoric', amount, fee: defaultFee },
         { src: '@agoric', dest: '<Cash>', amount },
       );
       break;
+    case 'Beefy':
+      const beefyChain = evmChain || 'Avalanche';
+      console.log('[Beefy withdrawal] Creating steps with chain:', beefyChain, 'vault:', beefyVaultNames[beefyChain]);
+      allSteps.push(
+        {
+          src: beefyVaultNames[beefyChain],
+          dest: `@${beefyChain}`,
+          amount,
+          fee: defaultFee,
+          detail: { evmGas: 200_000_000_000_000n },
+        },
+        { src: `@${beefyChain}`, dest: '@agoric', amount, fee: defaultFee },
+        { src: '@agoric', dest: '<Cash>', amount },
+      );
+      console.log('[Beefy withdrawal] allSteps created:', allSteps.length, 'steps');
+      break;
     default:
+      // Handle specific Beefy vaults
+      if (isBeefyProtocol(fromProtocol)) {
+        const vaultName = beefyProtocolToVault[fromProtocol];
+        const vaultChain = beefyProtocolToChain[fromProtocol];
+        console.log('[Specific Beefy vault withdrawal] Creating steps for vault:', vaultName, 'chain:', vaultChain);
+        allSteps.push(
+          {
+            src: vaultName,
+            dest: `@${vaultChain}`,
+            amount,
+            fee: defaultFee,
+            detail: { evmGas: 200_000_000_000_000n },
+          },
+          { src: `@${vaultChain}`, dest: '@agoric', amount, fee: defaultFee },
+          { src: '@agoric', dest: '<Cash>', amount },
+        );
+        console.log('[Specific Beefy vault withdrawal] allSteps created:', allSteps.length, 'steps');
+        break;
+      }
       alert(`Unsupported protocol: ${fromProtocol}`);
       return;
   }
@@ -436,11 +508,20 @@ const withdrawFromProtocol = (
             brand: usdcBrand as Brand<'nat'>,
             value: customStep.movement.amount.value,
           },
-          fee: customStep.movement.fee || (getBrand(useAppStore.getState().purses, 'BLD') ? { 
-            brand: getBrand(useAppStore.getState().purses, 'BLD') as Brand<'nat'>, 
-            value: 40n 
-          } : undefined),
-          detail: customStep.movement.detail || { evmGas: 200_000_000_000_000n },
+          fee:
+            customStep.movement.fee ||
+            (getBrand(useAppStore.getState().purses, 'BLD')
+              ? {
+                  brand: getBrand(
+                    useAppStore.getState().purses,
+                    'BLD',
+                  ) as Brand<'nat'>,
+                  value: 40n,
+                }
+              : undefined),
+          detail: customStep.movement.detail || {
+            evmGas: 200_000_000_000_000n,
+          },
         };
         customMovements.push(movement);
       }
@@ -448,33 +529,81 @@ const withdrawFromProtocol = (
   }
 
   // Filter steps based on selection if provided
+  console.log('[withdrawFromProtocol] Filtering. selectedSteps:', selectedSteps, 'allSteps count:', allSteps.length);
   const baseSteps =
     selectedSteps && selectedSteps.length > 0
       ? allSteps.filter(step => {
-          return selectedSteps.some(id => {
+          // Map each step to potential matching IDs
+          const stepMatchesId = (id: string) => {
+            const chain = evmChain || 'Avalanche';
+            let matches = false;
             switch (id) {
               case 'usdn-to-noble':
-                return step.src === 'USDNVault' && step.dest === '@noble';
+                matches = step.src === 'USDNVault' && step.dest === '@noble';
+                break;
               case `${fromProtocol.toLowerCase()}-to-evm`:
-                return (
-                  step.src === `${fromProtocol}_${evmChain || 'Avalanche'}` &&
-                  step.dest === `@${evmChain || 'Avalanche'}`
-                );
+                if (fromProtocol === 'Beefy') {
+                  matches = false; // Beefy uses 'beefy-to-evm' id
+                } else {
+                  matches = (
+                    step.src === `${fromProtocol}_${chain}` &&
+                    step.dest === `@${chain}`
+                  );
+                }
+                break;
+              case 'beefy-to-evm':
+                // Check if it's a specific Beefy vault
+                if (isBeefyProtocol(fromProtocol)) {
+                  const vaultName = beefyProtocolToVault[fromProtocol];
+                  const vaultChain = beefyProtocolToChain[fromProtocol];
+                  matches = (
+                    step.src === vaultName &&
+                    step.dest === `@${vaultChain}`
+                  );
+                  console.log(`[Filter] Checking 'beefy-to-evm' for specific vault:`, step.src, '===', vaultName, '&&', step.dest, '=== @' + vaultChain, '→', matches);
+                } else {
+                  // Legacy Beefy support
+                  matches = (
+                    step.src === beefyVaultNames[chain] &&
+                    step.dest === `@${chain}`
+                  );
+                  console.log(`[Filter] Checking 'beefy-to-evm' for step:`, step.src, '===', beefyVaultNames[chain], '&&', step.dest, '=== @' + chain, '→', matches);
+                }
+                break;
               case 'evm-to-noble':
-                return (
-                  step.src === `@${evmChain || 'Avalanche'}` &&
+                // Legacy support for old step structure
+                matches = (
+                  step.src === `@${chain}` &&
                   step.dest === '@noble'
                 );
+                break;
+              case 'evm-to-agoric':
+                matches = (
+                  step.src === `@${chain}` &&
+                  step.dest === '@agoric'
+                );
+                break;
               case 'noble-to-agoric':
-                return step.src === '@noble' && step.dest === '@agoric';
+                matches = step.src === '@noble' && step.dest === '@agoric';
+                break;
               case 'receive-cash':
-                return step.src === '@agoric' && step.dest === '<Cash>';
+                matches = step.src === '@agoric' && step.dest === '<Cash>';
+                break;
               default:
-                return false;
+                matches = false;
             }
-          });
+            return matches;
+          };
+
+          const matched = selectedSteps.some(stepMatchesId);
+          if (!matched) {
+            console.log('[Filter] Step NOT matched:', step.src, '→', step.dest);
+          }
+          return matched;
         })
       : allSteps;
+
+  console.log('[withdrawFromProtocol] After filtering. baseSteps count:', baseSteps.length);
 
   // Combine base steps with custom steps
   const steps = [...baseSteps, ...customMovements];
@@ -741,6 +870,9 @@ const MainPage = () => {
   const [environment, setEnvironment] = useState<Environment>(
     getInitialEnvironment(),
   );
+  const [contractVersion, setContractVersion] = useState<ContractVersion>(
+    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax1',
+  );
 
   const { wallet, purses, offerId } = useAppStore((state: AppState) => ({
     wallet: state.wallet,
@@ -767,6 +899,22 @@ const MainPage = () => {
       alert(
         'Environment changed. Please refresh the page to reconnect the wallet with the new environment.',
       );
+    }
+  };
+
+  const handleContractVersionChange = (newVersion: ContractVersion) => {
+    setContractVersion(newVersion);
+    localStorage.setItem('contractVersion', newVersion);
+
+    // Re-run setup to update the contract instance
+    setup(newVersion);
+
+    // If wallet was connected, notify user
+    if (wallet) {
+      alert(
+        `Contract version changed to ${newVersion}. The page will reload to apply changes.`,
+      );
+      window.location.reload();
     }
   };
 
@@ -816,6 +964,8 @@ const MainPage = () => {
         <div className="main-content">
           <div className="card">
             <Trade
+              contractVersion={contractVersion}
+              onContractVersionChange={handleContractVersionChange}
               makeOffer={(
                 usdcAmount,
                 bldFeeAmount,
@@ -866,9 +1016,13 @@ const MainPage = () => {
 };
 
 function App() {
+  const [contractVersion] = useState<ContractVersion>(
+    (localStorage.getItem('contractVersion') as ContractVersion) || 'ymax1',
+  );
+
   useEffect(() => {
-    setup();
-  }, []);
+    setup(contractVersion);
+  }, [contractVersion]);
 
   const { wallet, instances, purses } = useAppStore((state: AppState) => ({
     wallet: state.wallet,
@@ -890,6 +1044,7 @@ function App() {
             purses={purses}
             keplr={(window as any).keplr}
             chainId={ENDPOINTS.CHAIN_ID}
+            contractVersion={contractVersion}
           />
         }
       />

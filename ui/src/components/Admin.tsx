@@ -4,6 +4,7 @@ import { makeVstorageKit, makeVStorage } from '@agoric/client-utils';
 import { makeAgoricChainStorageWatcher, AgoricChainStoragePathKind as Kind } from '@agoric/rpc';
 import { reifyWalletEntry } from '../walletEntryProxy';
 import type { Environment } from '../types';
+import { ContractVersion } from '../constants';
 import WalletEntriesCard from './WalletEntriesCard';
 import ContractControlCard from './ContractControlCard';
 import CreatorFacetCard from './CreatorFacetCard';
@@ -19,6 +20,7 @@ type AdminProps = {
   purses?: Array<Purse>;
   keplr?: any;
   chainId?: string;
+  contractVersion?: ContractVersion;
 };
 
 const Admin: React.FC<AdminProps> = ({
@@ -29,10 +31,11 @@ const Admin: React.FC<AdminProps> = ({
   purses,
   keplr,
   chainId,
+  contractVersion: initialContractVersion = 'ymax1',
 }) => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [instanceInfo, setInstanceInfo] = useState<{
-    ymax0?: string;
+    contract?: string;
     postalService?: string;
   } | null>(null);
   const [instanceBlockHeight, setInstanceBlockHeight] = useState<string | null>(null);
@@ -42,6 +45,7 @@ const Admin: React.FC<AdminProps> = ({
   const [creatorFacetName, setCreatorFacetName] = useState<string>('creatorFacet');
   const [plannerAddress, setPlannerAddress] = useState<string>('');
   const [environment, setEnvironment] = useState<Environment>(getInitialEnvironment());
+  const [contractVersion, setContractVersion] = useState<ContractVersion>(initialContractVersion);
   const [ENDPOINTS, setENDPOINTS] = useState(configureEndpoints(getInitialEnvironment()));
   const watcherRef = useRef<ReturnType<typeof makeAgoricChainStorageWatcher> | null>(null);
   
@@ -101,8 +105,8 @@ const Admin: React.FC<AdminProps> = ({
 
     try {
       // Get board ID for target confirmation
-      const ymax0Instance = instanceInfo?.ymax0 ? instances?.find(([n]) => n === 'ymax0')?.[1] : null;
-      const [boardId] = ymax0Instance ? watcherRef.current.marshaller.toCapData(ymax0Instance).slots : [''];
+      const contractInstance = instanceInfo?.contract ? instances?.find(([n]) => n === contractVersion)?.[1] : null;
+      const [boardId] = contractInstance ? watcherRef.current.marshaller.toCapData(contractInstance).slots : [''];
       
       const { target, tools } = reifyWalletEntry<{ terminate: (args?: { message?: string; target?: string }) => Promise<any> }>({
         targetName: 'ymaxControl',
@@ -358,6 +362,16 @@ const Admin: React.FC<AdminProps> = ({
     }
   };
 
+  const handleContractVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newVersion = e.target.value as ContractVersion;
+    setContractVersion(newVersion);
+    localStorage.setItem('contractVersion', newVersion);
+
+    // Clear instance info when switching contract versions - useEffect will refetch
+    setInstanceInfo(null);
+    setInstanceBlockHeight(null);
+  };
+
   // Initialize watcher and vstorage client
   useEffect(() => {
     const watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
@@ -377,9 +391,9 @@ const Admin: React.FC<AdminProps> = ({
           return instancePair ? String(instancePair[1]) : undefined;
         };
 
-        const ymax0 = findInstance('ymax0');
+        const contract = findInstance(contractVersion);
         const postalService = findInstance('postalService');
-        setInstanceInfo({ ymax0, postalService });
+        setInstanceInfo({ contract, postalService });
       },
     );
 
@@ -400,7 +414,7 @@ const Admin: React.FC<AdminProps> = ({
       // Cleanup watcher if needed
       watcherRef.current = null;
     };
-  }, [ENDPOINTS]);
+  }, [ENDPOINTS, contractVersion]);
 
   // Watch wallet state for invitations, track pending entries, and get saved entries
   useEffect(() => {
@@ -567,18 +581,35 @@ const Admin: React.FC<AdminProps> = ({
       `}</style>
       <div style={{ position: 'relative', marginBottom: '1rem' }}>
         <h1 style={{ textAlign: 'left' }}>YMax Contract Control</h1>
-        
-        <div className="environment-selector" style={{ position: 'absolute', top: 0, right: 0 }}>
-          <label htmlFor="environment-select">Env: </label>
-          <select
-            id="environment-select"
-            value={environment}
-            onChange={handleEnvironmentChange}
-          >
-            <option value="mainnet">Mainnet</option>
-            <option value="devnet">Devnet</option>
-            <option value="localhost">Localhost</option>
-          </select>
+
+        <div style={{ position: 'absolute', top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+          <div className="contract-version-selector">
+            <label htmlFor="contract-version-select" style={{ marginRight: '0.5rem' }}>Contract: </label>
+            <select
+              id="contract-version-select"
+              value={contractVersion}
+              onChange={handleContractVersionChange}
+              style={{ padding: '0.25rem' }}
+            >
+              <option value="ymax1">ymax1 (Prod)</option>
+              <option value="ymax0">ymax0 (Dev)</option>
+            </select>
+          </div>
+
+          <div className="environment-selector">
+            <label htmlFor="environment-select" style={{ marginRight: '0.5rem' }}>Env: </label>
+            <select
+              id="environment-select"
+              value={environment}
+              onChange={handleEnvironmentChange}
+              style={{ padding: '0.25rem' }}
+            >
+              <option value="mainnet">Mainnet</option>
+              <option value="devnet">Devnet</option>
+              <option value="localhost">Localhost</option>
+            </select>
+          </div>
+
           <div className="environment-info">
             <small>
               RPC: {ENDPOINTS.RPC}
@@ -614,6 +645,7 @@ const Admin: React.FC<AdminProps> = ({
           onTerminate={handleTerminate}
           onUpgrade={handleUpgrade}
           onInstallAndStart={handleInstallAndStart}
+          contractVersion={contractVersion}
         />
 
         <CreatorFacetCard

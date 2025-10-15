@@ -2,6 +2,7 @@ import {
   makeAgoricChainStorageWatcher,
   AgoricChainStoragePathKind as Kind,
 } from '@agoric/rpc';
+import { ContractVersion } from '../constants';
 
 export type WalletState = {
   liveOffers: Array<[string, any]>;
@@ -353,11 +354,12 @@ export const parseTransactionEntry = (entry: any): PendingTransaction | null => 
 const fetchIndividualTransaction = async (
   watcher: ReturnType<typeof makeAgoricChainStorageWatcher>,
   txId: string,
+  contractVersion: ContractVersion,
 ): Promise<PendingTransaction | null> => {
   return new Promise((resolve, reject) => {
     let isResolved = false;
     let unsubscribe: (() => void) | null = null;
-    
+
     const cleanup = () => {
       if (unsubscribe && !isResolved) {
         try {
@@ -381,7 +383,7 @@ const fetchIndividualTransaction = async (
     };
 
     try {
-      const path = `published.ymax0.pendingTxs.${txId}`;
+      const path = `published.${contractVersion}.pendingTxs.${txId}`;
       console.log(`Fetching individual transaction data from: ${path}`);
 
       unsubscribe = watcher.watchLatest<any>(
@@ -447,15 +449,16 @@ const fetchIndividualTransaction = async (
 };
 
 /**
- * Fetches all transactions from ymax0 vstorage path
+ * Fetches all transactions from vstorage path
  */
 export const fetchAllTransactions = async (
   watcher: ReturnType<typeof makeAgoricChainStorageWatcher>,
+  contractVersion: ContractVersion,
 ): Promise<PendingTransaction[]> => {
   return new Promise((resolve, reject) => {
     let isResolved = false;
     let unsubscribe: (() => void) | null = null;
-    
+
     const cleanup = () => {
       if (unsubscribe && !isResolved) {
         try {
@@ -487,7 +490,7 @@ export const fetchAllTransactions = async (
     };
 
     try {
-      const path = 'published.ymax0.pendingTxs';
+      const path = `published.${contractVersion}.pendingTxs`;
       console.log('Watching all transactions at path:', path);
 
       // Use watchLatest to get the current state
@@ -546,7 +549,7 @@ export const fetchAllTransactions = async (
                   if (typeof item === 'string' && item.startsWith('tx')) {
                     const txId = item;
                     console.log(`Fetching individual data for transaction ID: ${txId}`);
-                    return await fetchIndividualTransaction(watcher, txId);
+                    return await fetchIndividualTransaction(watcher, txId, contractVersion);
                   } else {
                     // If the item is already transaction data, parse it normally
                     const txId = `tx${index}`;
@@ -648,9 +651,11 @@ export const fetchAllTransactions = async (
 export const testVstoragePath = async (
   watcher: ReturnType<typeof makeAgoricChainStorageWatcher>,
   walletAddress: string,
+  contractVersion: ContractVersion = 'ymax1',
 ): Promise<void> => {
   console.log('=== TESTING VSTORAGE PATHS ===');
   console.log('Wallet address:', walletAddress);
+  console.log('Contract version:', contractVersion);
 
   // Test different path formats
   const testPaths = [
@@ -658,7 +663,7 @@ export const testVstoragePath = async (
     `published.wallet.${walletAddress}`,
     `wallet.${walletAddress}.current`,
     `wallet.${walletAddress}`,
-    'published.ymax0.pendingTxs',
+    `published.${contractVersion}.pendingTxs`,
   ];
 
   for (const path of testPaths) {

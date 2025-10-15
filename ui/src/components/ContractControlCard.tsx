@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ContractControlCardProps {
-  instanceInfo: { ymax0?: string; postalService?: string } | null;
+  instanceInfo: { contract?: string; postalService?: string } | null;
   instanceBlockHeight: string | null;
   creatorFacetName: string;
   setCreatorFacetName: (value: string) => void;
@@ -16,10 +16,12 @@ interface ContractControlCardProps {
   onTerminate: () => void;
   onUpgrade: () => void;
   onInstallAndStart: () => void;
+  contractVersion?: string;
 }
 
 const ContractControlCard: React.FC<ContractControlCardProps> = ({
   instanceInfo,
+  contractVersion = 'ymax1',
   instanceBlockHeight,
   creatorFacetName,
   setCreatorFacetName,
@@ -37,16 +39,16 @@ const ContractControlCard: React.FC<ContractControlCardProps> = ({
 }) => {
   return (
     <div style={{ border: '2px solid #007bff', padding: '1rem', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
-      <h3 style={{ color: '#007bff', marginTop: 0, textAlign: 'left' }}>YMax Contract Control</h3>
-      
+      <h3 style={{ color: '#007bff', marginTop: 0, textAlign: 'left' }}>YMax Contract Control ({contractVersion})</h3>
+
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
         {/* Left: Instance Info */}
         <div style={{ flex: '0 0 300px' }}>
-          {instanceInfo?.ymax0 && (
+          {instanceInfo?.contract && (
             <div style={{ marginBottom: '0.5rem' }}>
-              <strong>Instance:</strong> {instanceInfo.ymax0}{' '}
+              <strong>Instance:</strong> {instanceInfo.contract}{' '}
               <button
-                onClick={() => navigator.clipboard.writeText(instanceInfo.ymax0!)}
+                onClick={() => navigator.clipboard.writeText(instanceInfo.contract!)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}
                 title="Copy instance"
               >

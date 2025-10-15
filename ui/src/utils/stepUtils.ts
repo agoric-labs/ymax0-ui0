@@ -1,6 +1,15 @@
 import { StepInfo } from '../components/StepSelector';
 import { MovementDesc, YieldProtocol, EVMChain } from '../ymax-client';
 
+// Beefy vault names are specific to each chain and vault type
+const beefyVaultNames: Record<EVMChain, string> = {
+  Avalanche: 'Beefy_re7_Avalanche',
+  Arbitrum: 'Beefy_compoundUsdc_Arbitrum',
+  Ethereum: 'Beefy_morphoGauntletUsdc_Ethereum',
+  Base: 'Beefy_morphoSeamlessUsdc_Base',
+  Optimism: 'Beefy_compoundUsdc_Optimism',
+};
+
 export const generateOpenPositionSteps = (
   yieldProtocol: YieldProtocol,
   evmChain: EVMChain,
@@ -64,6 +73,7 @@ export const generateOpenPositionSteps = (
           dest: `@${evmChain}`,
           amount: { brand: {} as Brand<'nat'>, value: usdcAmount },
           fee: { brand: {} as Brand<'nat'>, value: 2_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
 
@@ -76,6 +86,35 @@ export const generateOpenPositionSteps = (
           dest: `${yieldProtocol}_${evmChain}`,
           amount: { brand: {} as Brand<'nat'>, value: usdcAmount },
           fee: { brand: {} as Brand<'nat'>, value: 2_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
+        },
+      });
+      break;
+
+    case 'Beefy':
+      steps.push({
+        id: 'noble-to-evm',
+        name: `Bridge to ${evmChain}`,
+        description: `Transfer funds from Noble to ${evmChain} chain`,
+        movement: {
+          src: '@noble',
+          dest: `@${evmChain}`,
+          amount: { brand: {} as Brand<'nat'>, value: usdcAmount },
+          fee: { brand: {} as Brand<'nat'>, value: 2_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
+        },
+      });
+
+      steps.push({
+        id: `evm-to-beefy`,
+        name: `Deposit to Beefy`,
+        description: `Deposit funds into Beefy vault on ${evmChain}`,
+        movement: {
+          src: `@${evmChain}`,
+          dest: beefyVaultNames[evmChain],
+          amount: { brand: {} as Brand<'nat'>, value: usdcAmount },
+          fee: { brand: {} as Brand<'nat'>, value: 2_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
       break;
@@ -116,34 +155,66 @@ export const generateWithdrawSteps = (
           dest: `@${evmChain}`,
           amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
           fee: { brand: {} as Brand<'nat'>, value: 15_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
 
       steps.push({
-        id: 'evm-to-noble',
-        name: `Bridge from ${evmChain}`,
-        description: `Transfer funds from ${evmChain} to Noble chain`,
+        id: 'evm-to-agoric',
+        name: `Bridge to Agoric`,
+        description: `Transfer funds from ${evmChain} directly to Agoric chain`,
         movement: {
           src: `@${evmChain}`,
-          dest: '@noble',
+          dest: '@agoric',
           amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
           fee: { brand: {} as Brand<'nat'>, value: 15_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
+        },
+      });
+      break;
+
+    case 'Beefy':
+      steps.push({
+        id: 'beefy-to-evm',
+        name: `Withdraw from Beefy`,
+        description: `Withdraw funds from Beefy vault on ${evmChain}`,
+        movement: {
+          src: beefyVaultNames[evmChain],
+          dest: `@${evmChain}`,
+          amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
+          fee: { brand: {} as Brand<'nat'>, value: 15_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
+        },
+      });
+
+      steps.push({
+        id: 'evm-to-agoric',
+        name: `Bridge to Agoric`,
+        description: `Transfer funds from ${evmChain} directly to Agoric chain`,
+        movement: {
+          src: `@${evmChain}`,
+          dest: '@agoric',
+          amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
+          fee: { brand: {} as Brand<'nat'>, value: 15_000_000n },
+          detail: { evmGas: 200_000_000_000_000n },
         },
       });
       break;
   }
 
-  // Common final steps
-  steps.push({
-    id: 'noble-to-agoric',
-    name: 'Bridge to Agoric',
-    description: 'Transfer funds from Noble back to Agoric chain',
-    movement: {
-      src: '@noble',
-      dest: '@agoric',
-      amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
-    },
-  });
+  // Common final steps (only for USDN which still uses Noble)
+  if (fromProtocol === 'USDN') {
+    steps.push({
+      id: 'noble-to-agoric',
+      name: 'Bridge to Agoric',
+      description: 'Transfer funds from Noble to Agoric chain',
+      movement: {
+        src: '@noble',
+        dest: '@agoric',
+        amount: { brand: {} as Brand<'nat'>, value: withdrawAmount },
+      },
+    });
+  }
 
   steps.push({
     id: 'receive-cash',
@@ -164,15 +235,13 @@ export const filterMovementsBySelectedSteps = (
   selectedStepIds: string[],
   allSteps: StepInfo[],
 ): MovementDesc[] => {
-  return originalMovements.filter((movement) => {
+  return originalMovements.filter(movement => {
     const correspondingStep = allSteps.find(
-      (step) =>
+      step =>
         step.movement &&
         step.movement.src === movement.src &&
         step.movement.dest === movement.dest,
     );
-    return (
-      !correspondingStep || selectedStepIds.includes(correspondingStep.id)
-    );
+    return !correspondingStep || selectedStepIds.includes(correspondingStep.id);
   });
 };

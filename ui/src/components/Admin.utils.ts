@@ -65,13 +65,18 @@ export const formatActionColumn = (message: any) => {
 
         let invitationString = '...';
         if (
-          invitationSpec.source === 'agoricContract' &&
-          invitationSpec.instancePath &&
-          invitationSpec.callPipe
+          invitationSpec?.source === 'agoricContract' &&
+          invitationSpec?.instancePath &&
+          Array.isArray(invitationSpec.instancePath) &&
+          invitationSpec?.callPipe &&
+          Array.isArray(invitationSpec.callPipe) &&
+          invitationSpec.callPipe.length > 0
         ) {
           const instance = `instance.${invitationSpec.instancePath.join('.')}`;
-          const call = invitationSpec.callPipe[0][0];
-          invitationString = `E(${instance}).${call}()`;
+          const call = invitationSpec.callPipe[0]?.[0];
+          if (call) {
+            invitationString = `E(${instance}).${call}()`;
+          }
         }
 
         const formatProposalPart = (part: object) => {
