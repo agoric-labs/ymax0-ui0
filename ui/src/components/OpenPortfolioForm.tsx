@@ -103,6 +103,17 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
 
       const chainId = walletClient.chain?.id || SEPOLIA_CONTRACTS.CHAIN_ID;
 
+      // Check if wallet is connected to the correct network
+      if (chainId !== SEPOLIA_CONTRACTS.CHAIN_ID) {
+        const networkName = chainId === 1 ? 'Ethereum Mainnet' : `chain ${chainId}`;
+        setError(
+          `Wrong network: You're connected to ${networkName} but this page requires Sepolia testnet (chain ID ${SEPOLIA_CONTRACTS.CHAIN_ID}). ` +
+          `Please switch to Sepolia in MetaMask. See: https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/`
+        );
+        setSigning(false);
+        return;
+      }
+
       // Step 1: Sign Permit2 PermitTransferFrom
       setCurrentStep('Signing Permit2 (1/2)...');
       
@@ -201,6 +212,32 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
   return (
     <div style={{ marginBottom: '30px' }}>
       <h2>Open Portfolio with Deposit</h2>
+
+      {/* Network Status Info */}
+      <div style={{
+        marginBottom: '20px',
+        padding: '12px',
+        background: walletClient.chain?.id === SEPOLIA_CONTRACTS.CHAIN_ID ? '#d1ecf1' : '#fff3cd',
+        border: `1px solid ${walletClient.chain?.id === SEPOLIA_CONTRACTS.CHAIN_ID ? '#bee5eb' : '#ffeeba'}`,
+        borderRadius: '4px',
+        fontSize: '14px',
+      }}>
+        <strong>Network:</strong>{' '}
+        {walletClient.chain?.name || 'Unknown'} (Chain ID: {walletClient.chain?.id || 'unknown'})
+        {walletClient.chain?.id !== SEPOLIA_CONTRACTS.CHAIN_ID && (
+          <div style={{ marginTop: '8px', color: '#856404' }}>
+            ⚠️ Please switch to <strong>Sepolia testnet</strong> to use this page.{' '}
+            <a 
+              href="https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ color: '#004085', textDecoration: 'underline' }}
+            >
+              How to add Sepolia
+            </a>
+          </div>
+        )}
+      </div>
 
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
