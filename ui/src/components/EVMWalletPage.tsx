@@ -32,9 +32,8 @@ const mockEVMHandler = {
     console.log(JSON.stringify(signed.permit, null, 2));
     console.log('\n--- OpenPortfolio Intent ---');
     console.log(JSON.stringify(signed.intent, null, 2));
-    console.log('\n--- Allocations (parsed) ---');
-    const allocations = JSON.parse(signed.intent.allocations);
-    console.log(JSON.stringify(allocations, null, 2));
+    console.log('\n--- Allocations ---');
+    console.log(JSON.stringify(signed.intent.allocations, null, 2));
   }
 };
 

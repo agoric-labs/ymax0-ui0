@@ -36,17 +36,17 @@ describe('OpenPortfolio EIP-712 Intent', () => {
         { nonce: 12345n, deadline: 67890n },
       );
 
-      expect(intent.depositor).toBe(TEST_ADDRESS);
+      // Note: depositor is not in the message - it can be recovered from signature
       expect(intent.deposit.token).toBe(SEPOLIA_CONTRACTS.USDC);
       expect(intent.deposit.amount).toBe('1000000');
       expect(intent.nonce).toBe('12345');
       expect(intent.deadline).toBe('67890');
 
-      // Verify allocations are JSON-encoded
-      const parsedAllocations = JSON.parse(intent.allocations);
-      expect(parsedAllocations).toHaveLength(2);
-      expect(parsedAllocations[0]).toEqual({ instrument: 'USDN', portion: '60' });
-      expect(parsedAllocations[1]).toEqual({ instrument: 'Aave_Ethereum', portion: '40' });
+      // Verify allocations are array of structs (not JSON, not parallel arrays)
+      expect(intent.allocations).toEqual([
+        { instrument: 'USDN', portion: '60' },
+        { instrument: 'Aave_Ethereum', portion: '40' },
+      ]);
     });
 
     it('supports flexible portion ratios (60:40 same as 6:4)', () => {
@@ -71,11 +71,14 @@ describe('OpenPortfolio EIP-712 Intent', () => {
       });
 
       // Both should create valid intents with different portion values but same ratio
-      const parsed1 = JSON.parse(intent1.allocations);
-      const parsed2 = JSON.parse(intent2.allocations);
-
-      expect(parsed1[0].portion).toBe('60');
-      expect(parsed2[0].portion).toBe('6');
+      expect(intent1.allocations).toEqual([
+        { instrument: 'A', portion: '60' },
+        { instrument: 'B', portion: '40' },
+      ]);
+      expect(intent2.allocations).toEqual([
+        { instrument: 'A', portion: '6' },
+        { instrument: 'B', portion: '4' },
+      ]);
 
       // Verify ratio is the same: 60/100 === 6/10
       const total1 = 60 + 40;
@@ -377,14 +380,14 @@ describe('OpenPortfolio EIP-712 Intent', () => {
         { nonce: 1n, deadline: 100n },
       );
 
-      const parsed = JSON.parse(intent.allocations);
-      expect(parsed).toHaveLength(3);
-      expect(parsed[0]).toEqual({ instrument: 'USDN', portion: '30' });
-      expect(parsed[1]).toEqual({ instrument: 'Aave_Ethereum', portion: '40' });
-      expect(parsed[2]).toEqual({ instrument: 'Compound_Arbitrum', portion: '30' });
+      expect(intent.allocations).toEqual([
+        { instrument: 'USDN', portion: '30' },
+        { instrument: 'Aave_Ethereum', portion: '40' },
+        { instrument: 'Compound_Arbitrum', portion: '30' },
+      ]);
 
       // Verify total portions
-      const total = parsed.reduce((sum: number, a: { portion: string }) => sum + parseInt(a.portion), 0);
+      const total = intent.allocations.reduce((sum, a) => sum + parseInt(a.portion), 0);
       expect(total).toBe(100);
     });
 
@@ -404,8 +407,13 @@ describe('OpenPortfolio EIP-712 Intent', () => {
         { nonce: 1n, deadline: 100n },
       );
 
-      const parsed = JSON.parse(intent.allocations);
-      const total = parsed.reduce((sum: number, a: { portion: string }) => sum + parseInt(a.portion), 0);
+      expect(intent.allocations).toEqual([
+        { instrument: 'USDN', portion: '3' },
+        { instrument: 'Aave_Ethereum', portion: '4' },
+        { instrument: 'Compound_Arbitrum', portion: '3' },
+      ]);
+      
+      const total = intent.allocations.reduce((sum, a) => sum + parseInt(a.portion), 0);
       expect(total).toBe(10);
 
       // Verify ratios are equivalent

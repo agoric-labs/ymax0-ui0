@@ -41,9 +41,8 @@ export const getOpenPortfolioDomain = (chainId: number): EIP712Domain => ({
  */
 export const getOpenPortfolioTypes = (): EIP712Types => ({
   OpenPortfolio: [
-    { name: 'depositor', type: 'address' },
     { name: 'deposit', type: 'TokenAmount' },
-    { name: 'allocations', type: 'string' },
+    { name: 'allocations', type: 'Allocation[]' },
     { name: 'nonce', type: 'uint256' },
     { name: 'deadline', type: 'uint256' },
   ],
@@ -51,12 +50,19 @@ export const getOpenPortfolioTypes = (): EIP712Types => ({
     { name: 'token', type: 'address' },
     { name: 'amount', type: 'uint256' },
   ],
+  Allocation: [
+    { name: 'instrument', type: 'string' },
+    { name: 'portion', type: 'uint256' },
+  ],
 });
 
 /**
  * Create OpenPortfolio intent message for EIP-712 signing
  *
- * @param depositorAddress - EVM address of the user (0x...)
+ * Note: depositorAddress parameter is kept for validation but not included in the message.
+ * The depositor can be recovered from the signature using ecRecover.
+ *
+ * @param depositorAddress - EVM address of the user (0x...) - used for validation only
  * @param depositAmount - Amount to deposit in smallest unit (e.g., 1000000 for 1 USDC)
  * @param allocations - Target allocations with portions
  * @param options - Optional nonce and deadline (defaults provided)
@@ -77,25 +83,23 @@ export const createOpenPortfolioIntent = (
   const deadline = options?.deadline ?? now + ONE_HOUR_IN_SECONDS;
   const tokenAddress = options?.tokenAddress ?? SEPOLIA_CONTRACTS.USDC;
 
-  // Convert allocations to a format compatible with EIP-712
-  // EIP-712 doesn't natively support arrays of complex structs,
-  // so we use JSON encoding as a workaround to represent the allocation mapping
-  const allocationsData = allocations.map(a => ({
+  // Convert allocations to EIP-712 compatible format
+  // Arrays of structs are supported in EIP-712 (dynamic struct fields are not)
+  const allocationsFormatted = allocations.map(a => ({
     instrument: a.instrument,
-    portion: a.portion.toString(),
+    portion: a.portion.toString() as `${number}`,
   }));
 
   const deposit: TokenAmount = {
-    token: tokenAddress,
-    amount: depositAmount.toString(),
+    token: tokenAddress as `0x${string}`,
+    amount: depositAmount.toString() as `${number}`,
   };
 
   return {
-    depositor: depositorAddress,
     deposit,
-    allocations: JSON.stringify(allocationsData),
-    nonce: nonce.toString(),
-    deadline: deadline.toString(),
+    allocations: allocationsFormatted,
+    nonce: nonce.toString() as `${number}`,
+    deadline: deadline.toString() as `${number}`,
   };
 };
 
