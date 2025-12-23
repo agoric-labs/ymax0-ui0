@@ -5,7 +5,7 @@
  * 2. OpenPortfolio intent with target allocations
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { WalletClient } from 'viem';
 import { SignatureTransfer, type PermitTransferFrom as Permit2Transfer } from '@uniswap/permit2-sdk';
 import type { TargetAllocation, SignedOpenPortfolio } from '../evm-portfolio-types';
@@ -58,6 +58,58 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
   const [signing, setSigning] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [currentChainId, setCurrentChainId] = useState<number | null>(null);
+  const [networkName, setNetworkName] = useState<string>('Unknown');
+
+  // Fetch current network on mount and when wallet changes
+  React.useEffect(() => {
+    const fetchNetwork = async () => {
+      if (window.ethereum) {
+        try {
+          const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' }) as string;
+          const chainId = parseInt(chainIdHex, 16);
+          setCurrentChainId(chainId);
+          
+          // Set network name based on chainId
+          if (chainId === 11155111) {
+            setNetworkName('Sepolia');
+          } else if (chainId === 1) {
+            setNetworkName('Ethereum Mainnet');
+          } else {
+            setNetworkName(`Chain ${chainId}`);
+          }
+        } catch (err) {
+          console.error('Failed to fetch chainId:', err);
+        }
+      }
+    };
+
+    fetchNetwork();
+
+    // Listen for network changes
+    const handleChainChanged = (chainIdHex: string) => {
+      const chainId = parseInt(chainIdHex, 16);
+      setCurrentChainId(chainId);
+      
+      if (chainId === 11155111) {
+        setNetworkName('Sepolia');
+      } else if (chainId === 1) {
+        setNetworkName('Ethereum Mainnet');
+      } else {
+        setNetworkName(`Chain ${chainId}`);
+      }
+    };
+
+    if (window.ethereum?.on) {
+      window.ethereum.on('chainChanged', handleChainChanged);
+    }
+
+    return () => {
+      if (window.ethereum?.removeListener) {
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      }
+    };
+  }, [walletClient]);
 
   const addAllocation = () => {
     setAllocations([...allocations, { instrument: 'USDN', portion: 0 }]);
@@ -101,7 +153,9 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
         return;
       }
 
-      const chainId = walletClient.chain?.id || SEPOLIA_CONTRACTS.CHAIN_ID;
+      // Get the actual chainId from the wallet
+      const chainIdHex = await window.ethereum?.request({ method: 'eth_chainId' }) as string;
+      const chainId = parseInt(chainIdHex, 16);
 
       // Check if wallet is connected to the correct network
       if (chainId !== SEPOLIA_CONTRACTS.CHAIN_ID) {
@@ -217,14 +271,14 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
       <div style={{
         marginBottom: '20px',
         padding: '12px',
-        background: walletClient.chain?.id === SEPOLIA_CONTRACTS.CHAIN_ID ? '#d1ecf1' : '#fff3cd',
-        border: `1px solid ${walletClient.chain?.id === SEPOLIA_CONTRACTS.CHAIN_ID ? '#bee5eb' : '#ffeeba'}`,
+        background: currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID ? '#d1ecf1' : '#fff3cd',
+        border: `1px solid ${currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID ? '#bee5eb' : '#ffeeba'}`,
         borderRadius: '4px',
         fontSize: '14px',
       }}>
         <strong>Network:</strong>{' '}
-        {walletClient.chain?.name || 'Unknown'} (Chain ID: {walletClient.chain?.id || 'unknown'})
-        {walletClient.chain?.id !== SEPOLIA_CONTRACTS.CHAIN_ID && (
+        {networkName} (Chain ID: {currentChainId ?? 'detecting...'})
+        {currentChainId !== SEPOLIA_CONTRACTS.CHAIN_ID && currentChainId !== null && (
           <div style={{ marginTop: '8px', color: '#856404' }}>
             ⚠️ Please switch to <strong>Sepolia testnet</strong> to use this page.{' '}
             <a 

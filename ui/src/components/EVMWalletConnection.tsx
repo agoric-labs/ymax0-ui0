@@ -5,7 +5,6 @@
 
 import { useState } from 'react';
 import { createWalletClient, custom, type WalletClient } from 'viem';
-import { sepolia } from 'viem/chains';
 
 interface Props {
   address: string;
@@ -33,10 +32,10 @@ export function EVMWalletConnection({ address, onAddressChange, onClientChange }
       }) as string[];
       
       if (accounts && accounts.length > 0) {
-        // Create viem wallet client
+        // Create viem wallet client without specifying chain
+        // This allows it to detect the actual connected chain from the wallet
         const client = createWalletClient({
           account: accounts[0] as `0x${string}`,
-          chain: sepolia,
           transport: custom(window.ethereum),
         });
         
