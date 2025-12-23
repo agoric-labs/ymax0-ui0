@@ -27,12 +27,13 @@ export interface TokenAmount {
 
 /**
  * EIP-712 Domain for YMax Portfolio Authorization
+ * chainId is required for proper EIP-712 validation
  */
 export interface EIP712Domain {
   name: string;
   version: string;
-  chainId?: number;
-  verifyingContract?: string;
+  chainId: number;
+  verifyingContract?: string; // Optional: only needed if validating against a specific contract
 }
 
 /**

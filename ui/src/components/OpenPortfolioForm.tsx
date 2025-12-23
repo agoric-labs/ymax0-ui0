@@ -18,6 +18,19 @@ import {
   SEPOLIA_CONTRACTS,
 } from '../open-portfolio-eip712';
 
+// Constants
+const ONE_HOUR_IN_SECONDS = 3600n;
+
+// Type conversion helpers for Permit2 SDK (ethers v5) to viem compatibility
+type Permit2DomainToViem = {
+  name: string;
+  version: string;
+  chainId: number;
+  verifyingContract: `0x${string}`;
+};
+
+type Permit2TypesToViem = Record<string, Array<{ name: string; type: string }>>;
+
 interface Props {
   userAddress: string;
   walletClient: WalletClient;
@@ -94,7 +107,7 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
       setCurrentStep('Signing Permit2 (1/2)...');
       
       const now = BigInt(Math.floor(Date.now() / 1000));
-      const deadline = now + 3600n; // 1 hour
+      const deadline = now + ONE_HOUR_IN_SECONDS;
 
       const permit: Permit2Transfer = {
         permitted: {
@@ -112,17 +125,20 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
       console.log('Permit2 signature request:', { domain: permit2Domain, types: permit2Types, values: permit2Values });
 
       // Convert Permit2 SDK format (ethers v5) to viem format
+      // The Permit2 SDK returns TypedDataDomain which needs conversion to viem's format
+      const viemPermit2Domain: Permit2DomainToViem = {
+        name: permit2Domain.name!,
+        version: permit2Domain.version!,
+        chainId: permit2Domain.chainId!,
+        verifyingContract: permit2Domain.verifyingContract! as `0x${string}`,
+      };
+
       const permitSignature = await walletClient.signTypedData({
         account: userAddress as `0x${string}`,
-        domain: {
-          name: permit2Domain.name,
-          version: permit2Domain.version,
-          chainId: permit2Domain.chainId,
-          verifyingContract: permit2Domain.verifyingContract as `0x${string}`,
-        },
-        types: permit2Types as any,
+        domain: viemPermit2Domain,
+        types: permit2Types as Permit2TypesToViem,
         primaryType: 'PermitTransferFrom',
-        message: permit2Values as any,
+        message: permit2Values as Record<string, unknown>,
       });
 
       console.log('Permit2 signature received:', permitSignature);
@@ -142,12 +158,14 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
 
       console.log('OpenPortfolio intent signature request:', { domain: intentDomain, types: intentTypes, message: intent });
 
+      // Cast to viem-compatible types
+      // The intentTypes are already in the correct format but TS needs explicit typing
       const intentSignature = await walletClient.signTypedData({
         account: userAddress as `0x${string}`,
-        domain: intentDomain as any,
-        types: intentTypes as any,
+        domain: intentDomain as { name: string; version: string; chainId?: number },
+        types: intentTypes as Permit2TypesToViem,
         primaryType: 'OpenPortfolio',
-        message: intent as any,
+        message: intent as Record<string, unknown>,
       });
 
       console.log('OpenPortfolio intent signature received:', intentSignature);

@@ -23,6 +23,11 @@ export const SEPOLIA_CONTRACTS = {
 } as const;
 
 /**
+ * Time constants
+ */
+export const ONE_HOUR_IN_SECONDS = 3600n;
+
+/**
  * Get EIP-712 domain for OpenPortfolio intent
  */
 export const getOpenPortfolioDomain = (chainId: number): EIP712Domain => ({
@@ -69,11 +74,12 @@ export const createOpenPortfolioIntent = (
 ): OpenPortfolioIntent => {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const nonce = options?.nonce ?? now;
-  const deadline = options?.deadline ?? now + 3600n; // 1 hour default
+  const deadline = options?.deadline ?? now + ONE_HOUR_IN_SECONDS;
   const tokenAddress = options?.tokenAddress ?? SEPOLIA_CONTRACTS.USDC;
 
   // Convert allocations to a format compatible with EIP-712
-  // Using JSON string to work around EIP-712's limitation with dynamic arrays
+  // EIP-712 doesn't natively support arrays of complex structs,
+  // so we use JSON encoding as a workaround to represent the allocation mapping
   const allocationsData = allocations.map(a => ({
     instrument: a.instrument,
     portion: a.portion.toString(),
