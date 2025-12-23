@@ -1,0 +1,308 @@
+/**
+ * OpenPortfolio Form Component
+ * Handles form input and triggers EIP-712 signatures for:
+ * 1. Permit2 PermitTransferFrom (USDC allowance)
+ * 2. OpenPortfolio intent with target allocations
+ */
+
+import { useState } from 'react';
+import type { WalletClient } from 'viem';
+import { SignatureTransfer, type PermitTransferFrom as Permit2Transfer } from '@uniswap/permit2-sdk';
+import type { TargetAllocation, SignedOpenPortfolio } from '../evm-portfolio-types';
+import {
+  createOpenPortfolioIntent,
+  getOpenPortfolioDomain,
+  getOpenPortfolioTypes,
+  parseUSDCAmount,
+  validateAllocations,
+  SEPOLIA_CONTRACTS,
+} from '../open-portfolio-eip712';
+
+interface Props {
+  userAddress: string;
+  walletClient: WalletClient;
+  onSigned: (result: SignedOpenPortfolio) => void;
+}
+
+const POOL_OPTIONS = [
+  'USDN',
+  'Aave_Ethereum',
+  'Aave_Arbitrum',
+  'Aave_Optimism',
+  'Aave_Base',
+  'Compound_Ethereum',
+  'Compound_Arbitrum',
+  'Compound_Optimism',
+  'Compound_Base',
+];
+
+export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props) {
+  const [amount, setAmount] = useState('15'); // Default 15 USDC
+  const [allocations, setAllocations] = useState<TargetAllocation[]>([
+    { instrument: 'USDN', portion: 60 },
+    { instrument: 'Aave_Ethereum', portion: 40 },
+  ]);
+  const [signing, setSigning] = useState(false);
+  const [currentStep, setCurrentStep] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  const addAllocation = () => {
+    setAllocations([...allocations, { instrument: 'USDN', portion: 0 }]);
+  };
+
+  const updateAllocation = (index: number, field: keyof TargetAllocation, value: string | number) => {
+    const updated = [...allocations];
+    if (field === 'portion') {
+      updated[index] = { ...updated[index], portion: typeof value === 'string' ? parseInt(value) || 0 : value };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+    setAllocations(updated);
+  };
+
+  const removeAllocation = (index: number) => {
+    setAllocations(allocations.filter((_, i) => i !== index));
+  };
+
+  const totalPortions = allocations.reduce((sum, alloc) => sum + alloc.portion, 0);
+
+  const signMessages = async () => {
+    if (totalPortions === 0) {
+      setError('Total allocation must be greater than zero');
+      return;
+    }
+
+    setSigning(true);
+    setError('');
+
+    try {
+      // Validate allocations
+      validateAllocations(allocations);
+
+      // Parse amount to smallest unit (6 decimals for USDC)
+      const amountInSmallestUnit = parseUSDCAmount(amount);
+
+      if (amountInSmallestUnit === 0n) {
+        setError('Amount must be greater than zero');
+        setSigning(false);
+        return;
+      }
+
+      const chainId = walletClient.chain?.id || SEPOLIA_CONTRACTS.CHAIN_ID;
+
+      // Step 1: Sign Permit2 PermitTransferFrom
+      setCurrentStep('Signing Permit2 (1/2)...');
+      
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      const deadline = now + 3600n; // 1 hour
+
+      const permit: Permit2Transfer = {
+        permitted: {
+          token: SEPOLIA_CONTRACTS.USDC,
+          amount: amountInSmallestUnit,
+        },
+        spender: SEPOLIA_CONTRACTS.FACTORY,
+        nonce: now,
+        deadline,
+      };
+
+      const { domain: permit2Domain, types: permit2Types, values: permit2Values } = 
+        SignatureTransfer.getPermitData(permit, SEPOLIA_CONTRACTS.PERMIT2, chainId);
+
+      console.log('Permit2 signature request:', { domain: permit2Domain, types: permit2Types, values: permit2Values });
+
+      // Convert Permit2 SDK format (ethers v5) to viem format
+      const permitSignature = await walletClient.signTypedData({
+        account: userAddress as `0x${string}`,
+        domain: {
+          name: permit2Domain.name,
+          version: permit2Domain.version,
+          chainId: permit2Domain.chainId,
+          verifyingContract: permit2Domain.verifyingContract as `0x${string}`,
+        },
+        types: permit2Types as any,
+        primaryType: 'PermitTransferFrom',
+        message: permit2Values as any,
+      });
+
+      console.log('Permit2 signature received:', permitSignature);
+
+      // Step 2: Sign OpenPortfolio intent
+      setCurrentStep('Signing OpenPortfolio intent (2/2)...');
+
+      const intent = createOpenPortfolioIntent(
+        userAddress,
+        amountInSmallestUnit,
+        allocations,
+        { nonce: now, deadline, tokenAddress: SEPOLIA_CONTRACTS.USDC }
+      );
+
+      const intentDomain = getOpenPortfolioDomain(chainId);
+      const intentTypes = getOpenPortfolioTypes();
+
+      console.log('OpenPortfolio intent signature request:', { domain: intentDomain, types: intentTypes, message: intent });
+
+      const intentSignature = await walletClient.signTypedData({
+        account: userAddress as `0x${string}`,
+        domain: intentDomain as any,
+        types: intentTypes as any,
+        primaryType: 'OpenPortfolio',
+        message: intent as any,
+      });
+
+      console.log('OpenPortfolio intent signature received:', intentSignature);
+
+      // Combine results
+      const result: SignedOpenPortfolio = {
+        permitSignature,
+        intentSignature,
+        permit: {
+          permitted: {
+            token: permit.permitted.token,
+            amount: permit.permitted.amount.toString(),
+          },
+          spender: permit.spender,
+          nonce: permit.nonce.toString(),
+          deadline: permit.deadline.toString(),
+        },
+        intent,
+      };
+
+      setCurrentStep('');
+      onSigned(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to sign messages';
+      setError(message);
+      console.error('Signature error:', err);
+      setCurrentStep('');
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '30px' }}>
+      <h2>Open Portfolio with Deposit</h2>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          Deposit Amount (USDC):
+        </label>
+        <input
+          type="text"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          style={{ padding: '8px', width: '200px' }}
+          placeholder="15"
+          disabled={signing}
+        />
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+          Enter amount in USDC (e.g., "15" or "15.5")
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+          Target Allocation:
+        </label>
+
+        {allocations.map((alloc, index) => {
+          const percentage = totalPortions > 0 
+            ? ((alloc.portion / totalPortions) * 100).toFixed(1)
+            : '0.0';
+
+          return (
+            <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+              <select
+                value={alloc.instrument}
+                onChange={(e) => updateAllocation(index, 'instrument', e.target.value)}
+                style={{ padding: '5px', flex: 1 }}
+                disabled={signing}
+              >
+                {POOL_OPTIONS.map(pool => (
+                  <option key={pool} value={pool}>{pool}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={alloc.portion}
+                onChange={(e) => updateAllocation(index, 'portion', e.target.value)}
+                style={{ padding: '5px', width: '100px' }}
+                placeholder="Portion"
+                min="0"
+                disabled={signing}
+              />
+              <span style={{ fontSize: '12px', color: '#666', minWidth: '60px' }}>
+                ({percentage}%)
+              </span>
+              <button
+                onClick={() => removeAllocation(index)}
+                style={{
+                  padding: '5px 10px',
+                  background: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '3px',
+                  cursor: signing ? 'not-allowed' : 'pointer'
+                }}
+                disabled={signing}
+              >
+                Remove
+              </button>
+            </div>
+          );
+        })}
+
+        <button
+          onClick={addAllocation}
+          style={{
+            padding: '8px 16px',
+            background: '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '3px',
+            cursor: signing ? 'not-allowed' : 'pointer',
+            marginTop: '10px'
+          }}
+          disabled={signing}
+        >
+          + Add Allocation
+        </button>
+
+        <div style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
+          Total: {totalPortions} portions (100%)
+        </div>
+      </div>
+
+      <button
+        onClick={signMessages}
+        disabled={signing || totalPortions === 0}
+        style={{
+          padding: '12px 24px',
+          fontSize: '16px',
+          background: signing || totalPortions === 0 ? '#6c757d' : '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: signing || totalPortions === 0 ? 'not-allowed' : 'pointer',
+          fontWeight: 'bold'
+        }}
+      >
+        {signing ? currentStep || 'Signing...' : 'Open Portfolio'}
+      </button>
+
+      {error && (
+        <div style={{
+          color: '#721c24',
+          backgroundColor: '#f8d7da',
+          border: '1px solid #f5c6cb',
+          borderRadius: '4px',
+          padding: '12px',
+          marginTop: '15px'
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+    </div>
+  );
+}

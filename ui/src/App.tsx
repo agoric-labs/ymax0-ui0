@@ -16,6 +16,7 @@ import { Logos } from './components/Logos';
 import { Inventory } from './components/Inventory';
 import { Trade } from './components/Trade';
 import Admin from './components/Admin.tsx';
+import { EVMWalletPage } from './components/EVMWalletPage';
 import { makePortfolioSteps, beefyProtocolToVault, beefyProtocolToChain, isBeefyProtocol } from './ymax-client.ts';
 import { StepInfo } from './components/StepSelector';
 import type {
@@ -1033,6 +1034,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<MainPage />} />
+      <Route path="/evm-wallet" element={<EVMWalletPage />} />
       <Route
         path="/admin"
         element={

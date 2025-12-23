@@ -14,7 +14,6 @@
   "dependencies": {
     "@metamask/eth-sig-util": "^8.2.0",
     "@uniswap/permit2-sdk": "^1.4.0",
-    "ethers": "^6.16.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.23.1"
@@ -40,6 +39,7 @@
     "ses": "^1.8.0",
     "typescript": "^5.0.2",
     "typescript-eslint": "^7.13.1",
+    "viem": "^1.21.4",
     "vite": "^4.4.5",
     "vitest": "^1.2.1",
     "zustand": "^4.4.1"

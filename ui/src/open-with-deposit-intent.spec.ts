@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { TypedDataEncoder } from 'ethers';
+import { hashTypedData } from 'viem';
 import type { TargetAllocation } from './evm-portfolio-types';
 import {
   createOpenPortfolioIntent,
@@ -131,13 +131,23 @@ describe('OpenPortfolio EIP-712 Intent', () => {
       const domain = getOpenPortfolioDomain(SEPOLIA_CONTRACTS.CHAIN_ID);
       const types = getOpenPortfolioTypes();
 
-      // Should not throw when encoding
+      // Should not throw when hashing
       expect(() => {
-        TypedDataEncoder.encode(domain, types, intent);
+        hashTypedData({
+          domain,
+          types,
+          primaryType: 'OpenPortfolio',
+          message: intent,
+        });
       }).not.toThrow();
 
       // Verify hash can be computed
-      const hash = TypedDataEncoder.hash(domain, types, intent);
+      const hash = hashTypedData({
+        domain,
+        types,
+        primaryType: 'OpenPortfolio',
+        message: intent,
+      });
       expect(hash).toMatch(/^0x[0-9a-fA-F]{64}$/);
     });
 
@@ -161,8 +171,18 @@ describe('OpenPortfolio EIP-712 Intent', () => {
       const domain = getOpenPortfolioDomain(SEPOLIA_CONTRACTS.CHAIN_ID);
       const types = getOpenPortfolioTypes();
 
-      const hash1 = TypedDataEncoder.hash(domain, types, intent1);
-      const hash2 = TypedDataEncoder.hash(domain, types, intent2);
+      const hash1 = hashTypedData({
+        domain,
+        types,
+        primaryType: 'OpenPortfolio',
+        message: intent1,
+      });
+      const hash2 = hashTypedData({
+        domain,
+        types,
+        primaryType: 'OpenPortfolio',
+        message: intent2,
+      });
 
       expect(hash1).toBe(hash2);
     });
@@ -195,8 +215,18 @@ describe('OpenPortfolio EIP-712 Intent', () => {
       const domain = getOpenPortfolioDomain(SEPOLIA_CONTRACTS.CHAIN_ID);
       const types = getOpenPortfolioTypes();
 
-      const hash1 = TypedDataEncoder.hash(domain, types, intent1);
-      const hash2 = TypedDataEncoder.hash(domain, types, intent2);
+      const hash1 = hashTypedData({
+        domain,
+        types,
+        primaryType: 'OpenPortfolio',
+        message: intent1,
+      });
+      const hash2 = hashTypedData({
+        domain,
+        types,
+        primaryType: 'OpenPortfolio',
+        message: intent2,
+      });
 
       expect(hash1).not.toBe(hash2);
     });
