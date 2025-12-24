@@ -19,19 +19,32 @@ import { formatUSDCAmount } from '../open-portfolio-eip712';
 
 /**
  * Mock EVM Handler (based on makeEVMHandler pattern from createAndDeposit.ts)
- * In production, this would submit to an Agoric endpoint which forwards via IBC to Axelar
- * and then to the EVM chain (Base/Sepolia).
+ * 
+ * This testing app supports two execution styles:
+ * 
+ * 1. DIRECT STYLE (Issue #22): Mocks EMS, EMH, Orch, and Axelar
+ *    - UI directly invokes Factory.testExecute on Sepolia
+ *    - Skips app server, Agoric chain, and Axelar entirely
+ * 
+ * 2. MOCK CONSOLE STYLE: Logs the production flow for understanding
+ *    - Shows what would happen in production
+ *    - Production: UI → EMS → Agoric (EMH + Orch) → Axelar → EVM chain
+ * 
+ * Note: Nothing in this repository is production code.
+ * In production, the UI would submit to an EVM Message Service (EMS) app server.
  */
 const mockEVMHandler = {
   async handleOpenPortfolio(signed: SignedOpenPortfolio): Promise<void> {
-    console.log('=== Mock EVM Handler ===');
-    console.log('In production, this would:');
-    console.log('1. Submit to Agoric endpoint (via walletFactory invokeEntry)');
-    console.log('2. Agoric chain validates signatures and submits to Ymax contract');
-    console.log('3. Ymax contract uses Orchestration to send via IBC to Axelar');
-    console.log('4. Axelar GMP routes to EVM chain (Base/Sepolia)');
-    console.log('5. Factory contract creates wallet and deposits funds via Permit2');
-    console.log('\n--- Signed Data ---');
+    console.log('=== Mock Console: Production Flow ===');
+    console.log('This testing page shows what WOULD happen in production:\n');
+    console.log('1. UI submits signed intent to EVM Message Service (EMS) app server');
+    console.log('2. EMS wraps the intent and submits an Agoric transaction');
+    console.log('3. EVM Message Handler (EMH) on Agoric validates signatures');
+    console.log('4. EMH passes to Ymax contract, which uses Orchestrator');
+    console.log('5. Orchestrator sends IBC transaction to Axelar');
+    console.log('6. Axelar GMP routes to EVM chain (Base in production, Sepolia in testing)');
+    console.log('7. Factory contract creates wallet and deposits funds via Permit2\n');
+    console.log('--- Signed Data for Production Flow ---');
     console.log('Permit Signature:', signed.permitSignature);
     console.log('Intent Signature:', signed.intentSignature);
     console.log('\n--- Permit2 Data ---');
@@ -40,6 +53,9 @@ const mockEVMHandler = {
     console.log(JSON.stringify(signed.intent, null, 2));
     console.log('\n--- Allocations ---');
     console.log(JSON.stringify(signed.intent.allocations, null, 2));
+    console.log('\n=== Direct Style (Issue #22) ===');
+    console.log('The "Submit to Sepolia (Direct)" button MOCKS EMS, EMH, Orch, and Axelar');
+    console.log('by calling Factory.testExecute directly from this browser.');
   }
 };
 
@@ -115,20 +131,30 @@ export function EVMWalletPage() {
     if (!signedData) return;
     
     setProgressLog([]);
-    addProgress('=== Mock Handler (Console Only) ===');
-    addProgress('In production, this would:');
-    addProgress('1. Submit to Agoric endpoint (via walletFactory invokeEntry)');
-    addProgress('2. Agoric chain validates signatures and submits to Ymax contract');
-    addProgress('3. Ymax contract uses Orchestration to send via IBC to Axelar');
-    addProgress('4. Axelar GMP routes to EVM chain (Base/Sepolia)');
-    addProgress('5. Factory contract creates wallet and deposits funds via Permit2');
+    addProgress('=== Mock Handler: Production Flow (Console Logging) ===');
+    addProgress('This shows what WOULD happen in production:\n');
+    addProgress('1. UI → EVM Message Service (EMS) app server');
+    addProgress('   Submit signed intent to app server endpoint');
+    addProgress('');
+    addProgress('2. EMS → Agoric chain');
+    addProgress('   EMS wraps intent and submits Agoric transaction');
+    addProgress('');
+    addProgress('3. Agoric: EVM Message Handler (EMH)');
+    addProgress('   EMH validates signatures and recovers signer address');
+    addProgress('');
+    addProgress('4. Agoric: Ymax Contract + Orchestrator');
+    addProgress('   Ymax contract uses Orchestration to send IBC transaction');
+    addProgress('');
+    addProgress('5. Axelar GMP');
+    addProgress('   Axelar routes IBC message to target EVM chain');
+    addProgress('');
+    addProgress('6. EVM Chain: Factory Contract');
+    addProgress('   Factory creates wallet and deposits via Permit2');
+    addProgress('');
+    addProgress('Note: Nothing in this repository is production code.');
+    addProgress('The "Submit to Sepolia (Direct)" button MOCKS steps 1-5.');
     
-    console.log('=== Mock EVM Handler ===');
-    console.log('Permit Signature:', signedData.permitSignature);
-    console.log('Intent Signature:', signedData.intentSignature);
-    console.log('Permit2 Data:', signedData.permit);
-    console.log('OpenPortfolio Intent:', signedData.intent);
-    console.log('Allocations:', signedData.intent.allocations);
+    mockEVMHandler.handleOpenPortfolio(signedData);
     
     setSubmitted(true);
   };
@@ -159,8 +185,9 @@ export function EVMWalletPage() {
           fontSize: '14px',
           marginTop: '15px'
         }}>
-          <strong>Note:</strong> This page now supports direct submission to Sepolia testnet for testing.
-          You can also view the mock console output to understand the production flow via Agoric + Axelar.
+          <strong>Testing Options:</strong><br />
+          • <strong>Submit to Sepolia (Direct):</strong> Mocks EMS, EMH, Orch, and Axelar by directly calling Factory.testExecute<br />
+          • <strong>View Mock Flow:</strong> Logs the production flow (UI → EMS → Agoric → Axelar → EVM chain)
         </p>
       </div>
 
