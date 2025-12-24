@@ -3,10 +3,33 @@
  * Based on createAndDeposit.ts pattern
  */
 
-import { encodeAbiParameters, type WalletClient, type Address } from 'viem';
+import {
+  encodeAbiParameters,
+  createPublicClient,
+  http,
+  type WalletClient,
+  type Address,
+  type PublicClient,
+} from 'viem';
+import { sepolia } from 'viem/chains';
 import { getContract } from 'viem';
 import type { SignedOpenPortfolio } from './evm-portfolio-types';
 import { SEPOLIA_CONTRACTS } from './open-portfolio-eip712';
+
+/**
+ * Sepolia RPC URL for read operations
+ */
+const SEPOLIA_RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
+
+/**
+ * Get a public client for Sepolia
+ */
+const getSepoliaPublicClient = (): PublicClient => {
+  return createPublicClient({
+    chain: sepolia,
+    transport: http(SEPOLIA_RPC_URL),
+  });
+};
 
 /**
  * Factory contract ABI (minimal interface for testExecute)
@@ -180,10 +203,8 @@ export const ensurePermit2Allowance = async (
   const address = walletClient.account?.address;
   if (!address) throw new Error('No wallet address available');
 
-  const publicClient = await walletClient.getPublicClient?.();
-  if (!publicClient) {
-    throw new Error('No public client available from wallet client');
-  }
+  // Create a public client for read operations
+  const publicClient = getSepoliaPublicClient();
 
   const usdc = getContract({
     address: SEPOLIA_CONTRACTS.USDC,
@@ -289,10 +310,8 @@ export const checkUSDCBalance = async (
   const address = walletClient.account?.address;
   if (!address) throw new Error('No wallet address available');
 
-  const publicClient = await walletClient.getPublicClient?.();
-  if (!publicClient) {
-    throw new Error('No public client available from wallet client');
-  }
+  // Create a public client for read operations
+  const publicClient = getSepoliaPublicClient();
 
   const usdc = getContract({
     address: SEPOLIA_CONTRACTS.USDC,
