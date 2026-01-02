@@ -12,7 +12,11 @@ interface Props {
   onClientChange: (client: WalletClient | null) => void;
 }
 
-export function EVMWalletConnection({ address, onAddressChange, onClientChange }: Props) {
+export function EVMWalletConnection({
+  address,
+  onAddressChange,
+  onClientChange,
+}: Props) {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string>('');
 
@@ -27,10 +31,10 @@ export function EVMWalletConnection({ address, onAddressChange, onClientChange }
 
     try {
       // Request account access
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      }) as string[];
-      
+      const accounts = (await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      })) as string[];
+
       if (accounts && accounts.length > 0) {
         // Create viem wallet client without specifying chain
         // This allows it to detect the actual connected chain from the wallet
@@ -38,14 +42,15 @@ export function EVMWalletConnection({ address, onAddressChange, onClientChange }
           account: accounts[0] as `0x${string}`,
           transport: custom(window.ethereum),
         });
-        
+
         onAddressChange(accounts[0]);
         onClientChange(client);
       } else {
         setError('No accounts found. Please unlock MetaMask.');
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to connect wallet';
+      const message =
+        err instanceof Error ? err.message : 'Failed to connect wallet';
       setError(message);
       console.error('Wallet connection error:', err);
     } finally {
@@ -61,26 +66,35 @@ export function EVMWalletConnection({ address, onAddressChange, onClientChange }
 
   if (address) {
     return (
-      <div style={{ 
-        marginBottom: '30px', 
-        padding: '15px', 
-        background: '#d4edda', 
-        borderRadius: '4px',
-        border: '1px solid #c3e6cb'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div
+        style={{
+          marginBottom: '30px',
+          padding: '15px',
+          background: '#d4edda',
+          borderRadius: '4px',
+          border: '1px solid #c3e6cb',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
           <div>
-            <strong>Connected (EVM):</strong> {address.slice(0, 6)}...{address.slice(-4)}
+            <strong>Connected (EVM):</strong> {address.slice(0, 6)}...
+            {address.slice(-4)}
           </div>
-          <button 
-            onClick={disconnect} 
-            style={{ 
+          <button
+            onClick={disconnect}
+            style={{
               padding: '5px 10px',
               background: '#6c757d',
               color: 'white',
               border: 'none',
               borderRadius: '3px',
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             Disconnect
@@ -92,17 +106,17 @@ export function EVMWalletConnection({ address, onAddressChange, onClientChange }
 
   return (
     <div style={{ marginBottom: '30px' }}>
-      <button 
-        onClick={connectWallet} 
+      <button
+        onClick={connectWallet}
         disabled={connecting}
-        style={{ 
-          padding: '12px 24px', 
-          fontSize: '16px', 
-          background: connecting ? '#6c757d' : '#007bff', 
-          color: 'white', 
-          border: 'none', 
+        style={{
+          padding: '12px 24px',
+          fontSize: '16px',
+          background: connecting ? '#6c757d' : '#007bff',
+          color: 'white',
+          border: 'none',
           borderRadius: '4px',
-          cursor: connecting ? 'not-allowed' : 'pointer'
+          cursor: connecting ? 'not-allowed' : 'pointer',
         }}
       >
         {connecting ? 'Connecting...' : 'Connect MetaMask'}
