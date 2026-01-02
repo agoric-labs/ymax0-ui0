@@ -206,14 +206,21 @@ export const ensurePermit2Allowance = async (
   // Create a public client for read operations
   const publicClient = getSepoliaPublicClient();
 
-  const usdc = getContract({
+  // Create separate contracts for read and write operations
+  const usdcRead = getContract({
     address: SEPOLIA_CONTRACTS.USDC,
     abi: ERC20_ABI,
-    client: { public: publicClient, wallet: walletClient },
+    publicClient,
+  });
+
+  const usdcWrite = getContract({
+    address: SEPOLIA_CONTRACTS.USDC,
+    abi: ERC20_ABI,
+    walletClient,
   });
 
   // Check current allowance
-  const allowance = await usdc.read.allowance([address, SEPOLIA_CONTRACTS.PERMIT2]);
+  const allowance = await usdcRead.read.allowance([address, SEPOLIA_CONTRACTS.PERMIT2]);
   
   const sufficient = allowance >= amount;
   onProgress?.(
@@ -225,7 +232,7 @@ export const ensurePermit2Allowance = async (
   // Request approval
   onProgress?.('Requesting USDC approval for Permit2...');
   
-  const hash = await usdc.write.approve([SEPOLIA_CONTRACTS.PERMIT2, amount]);
+  const hash = await usdcWrite.write.approve([SEPOLIA_CONTRACTS.PERMIT2, amount]);
   
   onProgress?.(`Approval transaction submitted: ${hash}`);
   onProgress?.('Waiting for confirmation...');
@@ -234,7 +241,7 @@ export const ensurePermit2Allowance = async (
   await publicClient.waitForTransactionReceipt({ hash });
 
   // Verify new allowance
-  const newAllowance = await usdc.read.allowance([address, SEPOLIA_CONTRACTS.PERMIT2]);
+  const newAllowance = await usdcRead.read.allowance([address, SEPOLIA_CONTRACTS.PERMIT2]);
   onProgress?.(`USDC allowance to Permit2 (after): ${newAllowance.toString()}`);
 };
 
@@ -288,7 +295,7 @@ export const invokeFactoryDirect = async (
   const factory = getContract({
     address: SEPOLIA_CONTRACTS.FACTORY,
     abi: FACTORY_ABI,
-    client: walletClient,
+    walletClient,
   });
 
   onProgress?.('Invoking Factory.testExecute...');
@@ -316,7 +323,7 @@ export const checkUSDCBalance = async (
   const usdc = getContract({
     address: SEPOLIA_CONTRACTS.USDC,
     abi: ERC20_ABI,
-    client: { public: publicClient },
+    publicClient,
   });
 
   const balance = await usdc.read.balanceOf([address]);
