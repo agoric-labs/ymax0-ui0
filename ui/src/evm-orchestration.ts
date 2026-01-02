@@ -216,6 +216,7 @@ export const ensurePermit2Allowance = async (
   const usdcWrite = getContract({
     address: SEPOLIA_CONTRACTS.USDC,
     abi: ERC20_ABI,
+    chain: sepolia,
     walletClient,
   });
 
@@ -295,6 +296,7 @@ export const invokeFactoryDirect = async (
   const factory = getContract({
     address: SEPOLIA_CONTRACTS.FACTORY,
     abi: FACTORY_ABI,
+    chain: sepolia,
     walletClient,
   });
 
