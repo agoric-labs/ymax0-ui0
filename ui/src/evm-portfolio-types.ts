@@ -3,6 +3,7 @@
  */
 
 import type { PermitTransferFrom } from '@uniswap/permit2-sdk';
+import { TypedDataDomain } from 'viem';
 
 export type { PermitTransferFrom };
 
@@ -33,11 +34,11 @@ export interface TokenAmount {
  * EIP-712 Domain for YMax Portfolio Authorization
  * chainId is required for proper EIP-712 validation
  */
-export interface EIP712Domain {
+export interface EIP712Domain extends TypedDataDomain {
   name: string;
   version: string;
   chainId: number;
-  verifyingContract?: string; // Optional: only needed if validating against a specific contract
+  verifyingContract?: `0x${string}`; // Optional: only needed if validating against a specific contract
 }
 
 /**
