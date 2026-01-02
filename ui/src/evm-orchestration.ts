@@ -4,32 +4,18 @@
  */
 
 import {
+  Account,
+  Chain,
   encodeAbiParameters,
-  createPublicClient,
-  http,
-  type WalletClient,
+  Transport,
   type Address,
   type PublicClient,
+  type WalletClient,
 } from 'viem';
-import { sepolia } from 'viem/chains';
+
 import { getContract } from 'viem';
 import type { SignedOpenPortfolio } from './evm-portfolio-types';
 import { SEPOLIA_CONTRACTS } from './open-portfolio-eip712';
-
-/**
- * Sepolia RPC URL for read operations
- */
-const SEPOLIA_RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
-
-/**
- * Get a public client for Sepolia
- */
-const getSepoliaPublicClient = (): PublicClient => {
-  return createPublicClient({
-    chain: sepolia,
-    transport: http(SEPOLIA_RPC_URL),
-  });
-};
 
 /**
  * Factory contract ABI (minimal interface for testExecute)
@@ -80,16 +66,18 @@ const ERC20_ABI = [
 /**
  * Convert a normal 65-byte ECDSA signature (r,s,v) into EIP-2098 64-byte (r,vs).
  * vs = s with the highest bit set if v == 28 (or == 1 in 0/1 form)
- * 
+ *
  * EIP-2098 compact signatures save 1 byte and are used by many contracts
  * including the Factory contract for Permit2 verification.
  */
 export const toEip2098 = (signature65: `0x${string}`): `0x${string}` => {
   // Remove 0x prefix for processing
   const sig = signature65.slice(2);
-  
+
   if (sig.length !== 130) {
-    throw new Error(`Invalid signature length: expected 130 hex chars, got ${sig.length}`);
+    throw new Error(
+      `Invalid signature length: expected 130 hex chars, got ${sig.length}`,
+    );
   }
 
   const r = sig.slice(0, 64);
@@ -98,24 +86,24 @@ export const toEip2098 = (signature65: `0x${string}`): `0x${string}` => {
 
   // Convert s to BigInt
   const sBig = BigInt('0x' + s);
-  
+
   // High bit mask (bit 255)
   const HIGH_BIT = 1n << 255n;
-  
+
   // If v == 28 (or v == 1 in normalized form), set high bit; otherwise clear it
   // v can be 27/28 (standard) or 0/1 (normalized)
   const shouldSetBit = v === 28 || v === 1;
   const vsBig = shouldSetBit ? sBig | HIGH_BIT : sBig;
-  
+
   // Convert back to hex (32 bytes = 64 hex chars)
   const vsHex = vsBig.toString(16).padStart(64, '0');
-  
+
   return `0x${r}${vsHex}`;
 };
 
 /**
  * Build the CreateAndDepositPayload for Factory.testExecute
- * 
+ *
  * This encodes the permit and signature into the format expected by Factory.sol
  * The payload includes:
  * - ownerStr: Agoric address (e.g., "agoric1...")
@@ -188,41 +176,36 @@ export const buildCreateAndDepositPayload = ({
 
 /**
  * Check and ensure USDC allowance for Permit2 contract
- * 
+ *
  * Before using Permit2, the user must first approve the Permit2 contract
  * to spend their USDC tokens. This function checks the allowance and
  * prompts for approval if insufficient.
- * 
+ *
  * See: https://medium.com/@rcontreraspimentel/a-comprehensive-guide-to-uniswaps-permit2-d945c7291d88
  */
 export const ensurePermit2Allowance = async (
-  walletClient: WalletClient,
   amount: bigint,
+  client: {
+    public: PublicClient<Transport, Chain>;
+    wallet: WalletClient<Transport, Chain, Account>;
+  },
   onProgress?: (message: string) => void,
 ): Promise<void> => {
-  const address = walletClient.account?.address;
-  if (!address) throw new Error('No wallet address available');
-
-  // Create a public client for read operations
-  const publicClient = getSepoliaPublicClient();
+  const address = client.wallet.account.address;
 
   // Create separate contracts for read and write operations
-  const usdcRead = getContract({
+  const usdc = getContract({
     address: SEPOLIA_CONTRACTS.USDC,
     abi: ERC20_ABI,
-    publicClient,
-  });
-
-  const usdcWrite = getContract({
-    address: SEPOLIA_CONTRACTS.USDC,
-    abi: ERC20_ABI,
-    chain: sepolia,
-    walletClient,
+    client,
   });
 
   // Check current allowance
-  const allowance = await usdcRead.read.allowance([address, SEPOLIA_CONTRACTS.PERMIT2]);
-  
+  const allowance = await usdc.read.allowance([
+    address,
+    SEPOLIA_CONTRACTS.PERMIT2,
+  ]);
+
   const sufficient = allowance >= amount;
   onProgress?.(
     `USDC allowance to Permit2: ${allowance.toString()} ${sufficient ? '(sufficient)' : '(insufficient)'}`,
@@ -232,28 +215,31 @@ export const ensurePermit2Allowance = async (
 
   // Request approval
   onProgress?.('Requesting USDC approval for Permit2...');
-  
-  const hash = await usdcWrite.write.approve([SEPOLIA_CONTRACTS.PERMIT2, amount]);
-  
+
+  const hash = await usdc.write.approve([SEPOLIA_CONTRACTS.PERMIT2, amount]);
+
   onProgress?.(`Approval transaction submitted: ${hash}`);
   onProgress?.('Waiting for confirmation...');
 
   // Wait for transaction to be mined
-  await publicClient.waitForTransactionReceipt({ hash });
+  await client.public.waitForTransactionReceipt({ hash });
 
   // Verify new allowance
-  const newAllowance = await usdcRead.read.allowance([address, SEPOLIA_CONTRACTS.PERMIT2]);
+  const newAllowance = await usdc.read.allowance([
+    address,
+    SEPOLIA_CONTRACTS.PERMIT2,
+  ]);
   onProgress?.(`USDC allowance to Permit2 (after): ${newAllowance.toString()}`);
 };
 
 /**
  * Invoke Factory.testExecute directly on Sepolia
- * 
+ *
  * This is the "direct" approach that bypasses Agoric/Axelar and submits
  * the transaction directly to the EVM chain for testing purposes.
  */
 export const invokeFactoryDirect = async (
-  walletClient: WalletClient,
+  walletClient: WalletClient<Transport, Chain, Account>,
   signedData: SignedOpenPortfolio,
   onProgress?: (message: string) => void,
 ): Promise<{ hash: `0x${string}` }> => {
@@ -261,21 +247,23 @@ export const invokeFactoryDirect = async (
   if (!address) throw new Error('No wallet address available');
 
   onProgress?.('Converting signature to EIP-2098 format...');
-  
+
   // Convert 65-byte signature to 64-byte compact format
   const signature2098 = toEip2098(signedData.permitSignature as `0x${string}`);
-  
-  onProgress?.(`Signature: ${signature2098.length - 2} bytes (EIP-2098 compact)`);
+
+  onProgress?.(
+    `Signature: ${signature2098.length - 2} bytes (EIP-2098 compact)`,
+  );
 
   // Generate unique ownerStr (Agoric address) for create2
   // In production, this would be the actual Agoric address
   const ownerStr = `agoric1${Date.now()}`;
-  
+
   onProgress?.(`Agoric address (ownerStr): ${ownerStr}`);
 
   // Build the payload
   onProgress?.('Building CreateAndDepositPayload...');
-  
+
   const payload = buildCreateAndDepositPayload({
     ownerStr,
     tokenOwner: address,
@@ -296,15 +284,14 @@ export const invokeFactoryDirect = async (
   const factory = getContract({
     address: SEPOLIA_CONTRACTS.FACTORY,
     abi: FACTORY_ABI,
-    chain: sepolia,
-    walletClient,
+    client: { wallet: walletClient },
   });
 
   onProgress?.('Invoking Factory.testExecute...');
-  
+
   // Submit the transaction
   const hash = await factory.write.testExecute([payload]);
-  
+
   onProgress?.(`Transaction submitted: ${hash}`);
 
   return { hash };
@@ -314,18 +301,13 @@ export const invokeFactoryDirect = async (
  * Check USDC balance
  */
 export const checkUSDCBalance = async (
-  walletClient: WalletClient,
+  address: Account['address'],
+  publicClient: PublicClient,
 ): Promise<bigint> => {
-  const address = walletClient.account?.address;
-  if (!address) throw new Error('No wallet address available');
-
-  // Create a public client for read operations
-  const publicClient = getSepoliaPublicClient();
-
   const usdc = getContract({
     address: SEPOLIA_CONTRACTS.USDC,
     abi: ERC20_ABI,
-    publicClient,
+    client: { public: publicClient },
   });
 
   const balance = await usdc.read.balanceOf([address]);

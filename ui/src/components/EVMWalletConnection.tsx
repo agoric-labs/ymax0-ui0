@@ -4,12 +4,22 @@
  */
 
 import { useState } from 'react';
-import { createWalletClient, custom, type WalletClient } from 'viem';
+import {
+  Account,
+  createWalletClient,
+  custom,
+  type Chain,
+  type Transport,
+  type WalletClient,
+} from 'viem';
+import { sepolia } from 'viem/chains';
 
 interface Props {
   address: string;
   onAddressChange: (address: string) => void;
-  onClientChange: (client: WalletClient | null) => void;
+  onClientChange: (
+    client: WalletClient<Transport, Chain, Account> | null,
+  ) => void;
 }
 
 export function EVMWalletConnection({
@@ -35,12 +45,29 @@ export function EVMWalletConnection({
         method: 'eth_requestAccounts',
       })) as string[];
 
+      // Get the actual chainId from the wallet
+      const chainIdHex = (await window.ethereum?.request({
+        method: 'eth_chainId',
+      })) as string;
+      const chainId = parseInt(chainIdHex, 16);
+
+      // Check if wallet is connected to the correct network
+      if (chainId !== sepolia.id) {
+        const networkName =
+          chainId === 1 ? 'Ethereum Mainnet' : `chain ${chainId}`;
+        setError(
+          `Wrong network: You're connected to ${networkName} but this page requires Sepolia testnet (chain ID ${sepolia.id}). ` +
+            `Please switch to Sepolia in MetaMask. See: https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/`,
+        );
+        setConnecting(false);
+        return;
+      }
+
       if (accounts && accounts.length > 0) {
-        // Create viem wallet client without specifying chain
-        // This allows it to detect the actual connected chain from the wallet
         const client = createWalletClient({
           account: accounts[0] as `0x${string}`,
           transport: custom(window.ethereum),
+          chain: sepolia,
         });
 
         onAddressChange(accounts[0]);

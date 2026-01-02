@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import type { WalletClient } from 'viem';
+import type { Account, Chain, Transport, WalletClient } from 'viem';
 import { EVMWalletConnection } from './EVMWalletConnection';
 import { OpenPortfolioForm } from './OpenPortfolioForm';
 import type { SignedOpenPortfolio } from '../evm-portfolio-types';
@@ -16,6 +16,7 @@ import {
   checkUSDCBalance,
 } from '../evm-orchestration';
 import { formatUSDCAmount } from '../open-portfolio-eip712';
+import { useSepoliaPublicClient } from '../utils/sepoliaPublicClient.ts';
 
 /**
  * Mock EVM Handler (based on makeEVMHandler pattern from createAndDeposit.ts)
@@ -69,7 +70,11 @@ const mockEVMHandler = {
 
 export function EVMWalletPage() {
   const [evmAddress, setEvmAddress] = useState('');
-  const [walletClient, setWalletClient] = useState<WalletClient | null>(null);
+  const [walletClient, setWalletClient] = useState<WalletClient<
+    Transport,
+    Chain,
+    Account
+  > | null>(null);
   const [signedData, setSignedData] = useState<SignedOpenPortfolio | null>(
     null,
   );
@@ -79,15 +84,16 @@ export function EVMWalletPage() {
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [error, setError] = useState<string>('');
   const [usdcBalance, setUsdcBalance] = useState<bigint | null>(null);
+  const publicClient = useSepoliaPublicClient();
 
   // Check USDC balance when wallet connects
   React.useEffect(() => {
     if (walletClient) {
-      checkUSDCBalance(walletClient)
+      checkUSDCBalance(walletClient.account.address, publicClient)
         .then(setUsdcBalance)
         .catch(err => console.error('Failed to check USDC balance:', err));
     }
-  }, [walletClient]);
+  }, [walletClient, publicClient]);
 
   const addProgress = (message: string) => {
     setProgressLog(prev => [

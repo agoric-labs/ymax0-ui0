@@ -35,6 +35,9 @@ import {
   isBeefyProtocol,
   makePortfolioSteps,
 } from './ymax-client.ts';
+import { sepolia } from 'viem/chains';
+import { createPublicClient, http } from 'viem';
+import { PublicClientContext } from './utils/sepoliaPublicClient.ts';
 
 const { fromEntries } = Object;
 
@@ -42,6 +45,16 @@ let ENDPOINTS = configureEndpoints(getInitialEnvironment(), true);
 let watcher = makeAgoricChainStorageWatcher(ENDPOINTS.API, ENDPOINTS.CHAIN_ID);
 
 const useAppStore = create<AppState>(() => ({}) as AppState);
+
+/**
+ * Sepolia RPC URL for read operations
+ */
+const SEPOLIA_RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
+
+const sepoliaPublicClient = createPublicClient({
+  chain: sepolia,
+  transport: http(SEPOLIA_RPC_URL),
+});
 
 const setup = async (contractVersion: ContractVersion) => {
   watcher.watchLatest<Array<[string, unknown]>>(
@@ -447,7 +460,7 @@ const withdrawFromProtocol = (
       );
       break;
     case 'Aave':
-    case 'Compound':
+    case 'Compound': {
       const chain = evmChain || 'Avalanche';
       allSteps.push(
         {
@@ -461,7 +474,8 @@ const withdrawFromProtocol = (
         { src: '@agoric', dest: '<Cash>', amount },
       );
       break;
-    case 'Beefy':
+    }
+    case 'Beefy': {
       const beefyChain = evmChain || 'Avalanche';
       console.log(
         '[Beefy withdrawal] Creating steps with chain:',
@@ -486,6 +500,7 @@ const withdrawFromProtocol = (
         'steps',
       );
       break;
+    }
     default:
       // Handle specific Beefy vaults
       if (isBeefyProtocol(fromProtocol)) {
@@ -786,7 +801,7 @@ const acceptInvitation = () => {
     (update: { status: string; data?: unknown }) => {
       console.log('Accept invitation offer update:', update);
 
-      const bigintReplacer = (_k: string, v: any) =>
+      const bigintReplacer = (_k: string, v: unknown) =>
         typeof v === 'bigint' ? `${v}` : v;
       const offerDetails = JSON.stringify(update, bigintReplacer, 2);
 
@@ -842,7 +857,7 @@ const settleTransaction = (
     (update: { status: string; data?: unknown }) => {
       console.log('Settle transaction offer update:', update);
 
-      const bigintReplacer = (_k: string, v: any) =>
+      const bigintReplacer = (_k: string, v: unknown) =>
         typeof v === 'bigint' ? `${v}` : v;
       const offerDetails = JSON.stringify(update, bigintReplacer, 2);
 
@@ -1075,7 +1090,9 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<MainPage />} />
-      <Route path="/evm-wallet" element={<EVMWalletPage />} />
+      <PublicClientContext.Provider value={sepoliaPublicClient}>
+        <Route path="/evm-wallet" element={<EVMWalletPage />} />
+      </PublicClientContext.Provider>
       <Route
         path="/admin"
         element={

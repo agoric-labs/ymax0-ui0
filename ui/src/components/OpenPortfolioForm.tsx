@@ -5,41 +5,41 @@
  * 2. OpenPortfolio intent with target allocations
  */
 
-import React, { useState } from 'react';
-import type { WalletClient } from 'viem';
 import {
+  PermitTransferFromData,
   SignatureTransfer,
   type PermitTransferFrom as Permit2Transfer,
 } from '@uniswap/permit2-sdk';
+import { useState } from 'react';
 import type {
-  TargetAllocation,
+  Account,
+  Chain,
+  Transport,
+  TypedDataDomain,
+  WalletClient,
+} from 'viem';
+import { sepolia } from 'viem/chains';
+import type {
   SignedOpenPortfolio,
+  TargetAllocation,
 } from '../evm-portfolio-types';
 import {
   createOpenPortfolioIntent,
   getOpenPortfolioDomain,
   getOpenPortfolioTypes,
   parseUSDCAmount,
-  validateAllocations,
   SEPOLIA_CONTRACTS,
+  validateAllocations,
 } from '../open-portfolio-eip712';
 
 // Constants
 const ONE_HOUR_IN_SECONDS = 3600n;
 
-// Type conversion helpers for Permit2 SDK (ethers v5) to viem compatibility
-type Permit2DomainToViem = {
-  name: string;
-  version: string;
-  chainId: number;
-  verifyingContract: `0x${string}`;
-};
-
 type Permit2TypesToViem = Record<string, Array<{ name: string; type: string }>>;
 
 interface Props {
   userAddress: string;
-  walletClient: WalletClient;
+  walletClient: WalletClient<Transport, Chain, Account>;
   onSigned: (result: SignedOpenPortfolio) => void;
 }
 
@@ -60,7 +60,7 @@ export function OpenPortfolioForm({
   walletClient,
   onSigned,
 }: Props) {
-  const [amount, setAmount] = useState('15'); // Default 15 USDC
+  const [amount, setAmount] = useState<`${number}`>('15'); // Default 15 USDC
   const [allocations, setAllocations] = useState<TargetAllocation[]>([
     { instrument: 'USDN', portion: 60 },
     { instrument: 'Aave_Ethereum', portion: 40 },
@@ -68,60 +68,9 @@ export function OpenPortfolioForm({
   const [signing, setSigning] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>('');
   const [error, setError] = useState<string>('');
-  const [currentChainId, setCurrentChainId] = useState<number | null>(null);
-  const [networkName, setNetworkName] = useState<string>('Unknown');
 
-  // Fetch current network on mount and when wallet changes
-  React.useEffect(() => {
-    const fetchNetwork = async () => {
-      if (window.ethereum) {
-        try {
-          const chainIdHex = (await window.ethereum.request({
-            method: 'eth_chainId',
-          })) as string;
-          const chainId = parseInt(chainIdHex, 16);
-          setCurrentChainId(chainId);
-
-          // Set network name based on chainId
-          if (chainId === 11155111) {
-            setNetworkName('Sepolia');
-          } else if (chainId === 1) {
-            setNetworkName('Ethereum Mainnet');
-          } else {
-            setNetworkName(`Chain ${chainId}`);
-          }
-        } catch (err) {
-          console.error('Failed to fetch chainId:', err);
-        }
-      }
-    };
-
-    fetchNetwork();
-
-    // Listen for network changes
-    const handleChainChanged = (chainIdHex: string) => {
-      const chainId = parseInt(chainIdHex, 16);
-      setCurrentChainId(chainId);
-
-      if (chainId === 11155111) {
-        setNetworkName('Sepolia');
-      } else if (chainId === 1) {
-        setNetworkName('Ethereum Mainnet');
-      } else {
-        setNetworkName(`Chain ${chainId}`);
-      }
-    };
-
-    if (window.ethereum?.on) {
-      window.ethereum.on('chainChanged', handleChainChanged);
-    }
-
-    return () => {
-      if (window.ethereum?.removeListener) {
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
-      }
-    };
-  }, [walletClient]);
+  const currentChainId = walletClient.chain.id;
+  const networkName = walletClient.chain.name;
 
   const addAllocation = () => {
     setAllocations([...allocations, { instrument: 'USDN', portion: 0 }]);
@@ -133,13 +82,16 @@ export function OpenPortfolioForm({
     value: string | number,
   ) => {
     const updated = [...allocations];
-    if (field === 'portion') {
-      updated[index] = {
-        ...updated[index],
-        portion: typeof value === 'string' ? parseInt(value) || 0 : value,
-      };
-    } else {
-      updated[index] = { ...updated[index], [field]: value };
+    switch (field) {
+      case 'portion':
+        updated[index] = {
+          ...updated[index],
+          portion: typeof value === 'string' ? parseInt(value) || 0 : value,
+        };
+        break;
+      case 'instrument':
+        if (typeof value !== 'string') throw Error('bug!');
+        updated[index] = { ...updated[index], instrument: value };
     }
     setAllocations(updated);
   };
@@ -153,7 +105,7 @@ export function OpenPortfolioForm({
     0,
   );
 
-  const signMessages = async () => {
+  const signMessages = async (when: number) => {
     if (totalPortions === 0) {
       setError('Total allocation must be greater than zero');
       return;
@@ -175,16 +127,10 @@ export function OpenPortfolioForm({
         return;
       }
 
-      // Get the actual chainId from the wallet
-      const chainIdHex = (await window.ethereum?.request({
-        method: 'eth_chainId',
-      })) as string;
-      const chainId = parseInt(chainIdHex, 16);
-
       // Check if wallet is connected to the correct network
-      if (chainId !== SEPOLIA_CONTRACTS.CHAIN_ID) {
+      if (currentChainId !== sepolia.id) {
         const networkName =
-          chainId === 1 ? 'Ethereum Mainnet' : `chain ${chainId}`;
+          currentChainId === 1 ? 'Ethereum Mainnet' : `chain ${currentChainId}`;
         setError(
           `Wrong network: You're connected to ${networkName} but this page requires Sepolia testnet (chain ID ${SEPOLIA_CONTRACTS.CHAIN_ID}). ` +
             `Please switch to Sepolia in MetaMask. See: https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/`,
@@ -196,7 +142,7 @@ export function OpenPortfolioForm({
       // Step 1: Sign Permit2 PermitTransferFrom
       setCurrentStep('Signing Permit2 (1/2)...');
 
-      const now = BigInt(Math.floor(Date.now() / 1000));
+      const now = BigInt(Math.floor(when / 1000));
       const deadline = now + ONE_HOUR_IN_SECONDS;
 
       const permit: Permit2Transfer = {
@@ -216,8 +162,9 @@ export function OpenPortfolioForm({
       } = SignatureTransfer.getPermitData(
         permit,
         SEPOLIA_CONTRACTS.PERMIT2,
-        chainId,
-      );
+        currentChainId,
+        // TODO: Witness
+      ) as PermitTransferFromData;
 
       console.log('Permit2 signature request:', {
         domain: permit2Domain,
@@ -225,21 +172,12 @@ export function OpenPortfolioForm({
         values: permit2Values,
       });
 
-      // Convert Permit2 SDK format (ethers v5) to viem format
-      // The Permit2 SDK returns TypedDataDomain which needs conversion to viem's format
-      const viemPermit2Domain: Permit2DomainToViem = {
-        name: permit2Domain.name!,
-        version: permit2Domain.version!,
-        chainId: permit2Domain.chainId!,
-        verifyingContract: permit2Domain.verifyingContract! as `0x${string}`,
-      };
-
       const permitSignature = await walletClient.signTypedData({
         account: userAddress as `0x${string}`,
-        domain: viemPermit2Domain,
+        domain: permit2Domain as TypedDataDomain,
         types: permit2Types as Permit2TypesToViem,
         primaryType: 'PermitTransferFrom',
-        message: permit2Values as Record<string, unknown>,
+        message: permit2Values as unknown as Record<string, unknown>,
       });
 
       console.log('Permit2 signature received:', permitSignature);
@@ -254,7 +192,7 @@ export function OpenPortfolioForm({
         { nonce: now, deadline, tokenAddress: SEPOLIA_CONTRACTS.USDC },
       );
 
-      const intentDomain = getOpenPortfolioDomain(chainId);
+      const intentDomain = getOpenPortfolioDomain(currentChainId);
       const intentTypes = getOpenPortfolioTypes();
 
       console.log('OpenPortfolio intent signature request:', {
@@ -274,7 +212,7 @@ export function OpenPortfolioForm({
         },
         types: intentTypes as Permit2TypesToViem,
         primaryType: 'OpenPortfolio',
-        message: intent as Record<string, unknown>,
+        message: intent as unknown as Record<string, unknown>,
       });
 
       console.log('OpenPortfolio intent signature received:', intentSignature);
@@ -352,9 +290,9 @@ export function OpenPortfolioForm({
           Deposit Amount (USDC):
         </label>
         <input
-          type="text"
+          type="number"
           value={amount}
-          onChange={e => setAmount(e.target.value)}
+          onChange={e => setAmount(e.target.value as `${number}`)}
           style={{ padding: '8px', width: '200px' }}
           placeholder="15"
           disabled={signing}
@@ -457,7 +395,7 @@ export function OpenPortfolioForm({
       </div>
 
       <button
-        onClick={signMessages}
+        onClick={ev => signMessages(ev.timeStamp)}
         disabled={signing || totalPortions === 0}
         style={{
           padding: '12px 24px',

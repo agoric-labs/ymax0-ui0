@@ -72,34 +72,36 @@ export const createOpenPortfolioIntent = (
   depositorAddress: string,
   depositAmount: bigint,
   allocations: TargetAllocation[],
-  options?: {
+  options: {
     nonce?: bigint;
     deadline?: bigint;
-    tokenAddress?: string;
-  },
+    tokenAddress: string;
+  } = { tokenAddress: SEPOLIA_CONTRACTS.USDC },
 ): OpenPortfolioIntent => {
   const now = BigInt(Math.floor(Date.now() / 1000));
-  const nonce = options?.nonce ?? now;
-  const deadline = options?.deadline ?? now + ONE_HOUR_IN_SECONDS;
-  const tokenAddress = options?.tokenAddress ?? SEPOLIA_CONTRACTS.USDC;
+  const {
+    nonce = now,
+    deadline = now + ONE_HOUR_IN_SECONDS,
+    tokenAddress,
+  } = options;
 
   // Convert allocations to EIP-712 compatible format
   // Arrays of structs are supported in EIP-712 (dynamic struct fields are not)
   const allocationsFormatted = allocations.map(a => ({
     instrument: a.instrument,
-    portion: a.portion.toString() as `${number}`,
+    portion: `${a.portion}` as `${number}`,
   }));
 
   const deposit: TokenAmount = {
     token: tokenAddress as `0x${string}`,
-    amount: depositAmount.toString() as `${number}`,
+    amount: `${depositAmount}` as `${number}`,
   };
 
   return {
     deposit,
     allocations: allocationsFormatted,
-    nonce: nonce.toString() as `${number}`,
-    deadline: deadline.toString() as `${number}`,
+    nonce: `${nonce}` as `${number}`,
+    deadline: `${deadline}` as `${number}`,
   };
 };
 
@@ -110,13 +112,13 @@ export const createOpenPortfolioIntent = (
  * @param decimals - Number of decimals (6 for USDC)
  * @returns Human-readable string (e.g., "1.0")
  */
-export const formatUSDCAmount = (amount: bigint, decimals = 6): string => {
+export const formatUSDCAmount = (amount: bigint, decimals = 6): `${number}` => {
   const divisor = 10n ** BigInt(decimals);
   const wholePart = amount / divisor;
   const fractionalPart = amount % divisor;
 
   if (fractionalPart === 0n) {
-    return wholePart.toString();
+    return `${wholePart}` as `${number}`;
   }
 
   // Pad fractional part with leading zeros if needed
@@ -124,7 +126,7 @@ export const formatUSDCAmount = (amount: bigint, decimals = 6): string => {
   // Remove trailing zeros
   const trimmedFractional = fractionalStr.replace(/0+$/, '');
 
-  return `${wholePart}.${trimmedFractional}`;
+  return `${wholePart}.${trimmedFractional}` as `${number}`;
 };
 
 /**
@@ -134,7 +136,7 @@ export const formatUSDCAmount = (amount: bigint, decimals = 6): string => {
  * @param decimals - Number of decimals (6 for USDC)
  * @returns Amount in smallest unit
  */
-export const parseUSDCAmount = (amount: string, decimals = 6): bigint => {
+export const parseUSDCAmount = (amount: `${number}`, decimals = 6): bigint => {
   const parts = amount.split('.');
   const wholePart = BigInt(parts[0] || '0');
   const fractionalPart = parts[1] || '';
