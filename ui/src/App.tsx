@@ -1,35 +1,40 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 
-import './App.css';
+import type { Brand } from '@agoric/ertp/src/types.js';
+import { subscribeLatest } from '@agoric/notifier';
 import {
-  makeAgoricChainStorageWatcher,
   AgoricChainStoragePathKind as Kind,
+  makeAgoricChainStorageWatcher,
 } from '@agoric/rpc';
-import { create } from 'zustand';
 import {
   makeAgoricWalletConnection,
   suggestChain,
 } from '@agoric/web-components';
-import { subscribeLatest } from '@agoric/notifier';
-import { Logos } from './components/Logos';
-import { Inventory } from './components/Inventory';
-import { Trade } from './components/Trade';
+import { create } from 'zustand';
+import './App.css';
 import Admin from './components/Admin.tsx';
 import { EVMWalletPage } from './components/EVMWalletPage';
-import { makePortfolioSteps, beefyProtocolToVault, beefyProtocolToChain, isBeefyProtocol } from './ymax-client.ts';
+import { Inventory } from './components/Inventory';
+import { Logos } from './components/Logos';
 import { StepInfo } from './components/StepSelector';
+import { Trade } from './components/Trade';
+import { configureEndpoints, getInitialEnvironment } from './config';
+import { ContractVersion } from './constants';
 import type {
-  Environment,
   AppState,
-  YieldProtocol,
+  Environment,
   EVMChain,
   MovementDesc,
+  YieldProtocol,
 } from './types';
-import type { Brand } from '@agoric/ertp/src/types.js';
 import { getBrand } from './utils';
-import { getInitialEnvironment, configureEndpoints } from './config';
-import { ContractVersion } from './constants';
+import {
+  beefyProtocolToChain,
+  beefyProtocolToVault,
+  isBeefyProtocol,
+  makePortfolioSteps,
+} from './ymax-client.ts';
 
 const { fromEntries } = Object;
 
@@ -458,7 +463,12 @@ const withdrawFromProtocol = (
       break;
     case 'Beefy':
       const beefyChain = evmChain || 'Avalanche';
-      console.log('[Beefy withdrawal] Creating steps with chain:', beefyChain, 'vault:', beefyVaultNames[beefyChain]);
+      console.log(
+        '[Beefy withdrawal] Creating steps with chain:',
+        beefyChain,
+        'vault:',
+        beefyVaultNames[beefyChain],
+      );
       allSteps.push(
         {
           src: beefyVaultNames[beefyChain],
@@ -470,14 +480,23 @@ const withdrawFromProtocol = (
         { src: `@${beefyChain}`, dest: '@agoric', amount, fee: defaultFee },
         { src: '@agoric', dest: '<Cash>', amount },
       );
-      console.log('[Beefy withdrawal] allSteps created:', allSteps.length, 'steps');
+      console.log(
+        '[Beefy withdrawal] allSteps created:',
+        allSteps.length,
+        'steps',
+      );
       break;
     default:
       // Handle specific Beefy vaults
       if (isBeefyProtocol(fromProtocol)) {
         const vaultName = beefyProtocolToVault[fromProtocol];
         const vaultChain = beefyProtocolToChain[fromProtocol];
-        console.log('[Specific Beefy vault withdrawal] Creating steps for vault:', vaultName, 'chain:', vaultChain);
+        console.log(
+          '[Specific Beefy vault withdrawal] Creating steps for vault:',
+          vaultName,
+          'chain:',
+          vaultChain,
+        );
         allSteps.push(
           {
             src: vaultName,
@@ -489,7 +508,11 @@ const withdrawFromProtocol = (
           { src: `@${vaultChain}`, dest: '@agoric', amount, fee: defaultFee },
           { src: '@agoric', dest: '<Cash>', amount },
         );
-        console.log('[Specific Beefy vault withdrawal] allSteps created:', allSteps.length, 'steps');
+        console.log(
+          '[Specific Beefy vault withdrawal] allSteps created:',
+          allSteps.length,
+          'steps',
+        );
         break;
       }
       alert(`Unsupported protocol: ${fromProtocol}`);
@@ -530,7 +553,12 @@ const withdrawFromProtocol = (
   }
 
   // Filter steps based on selection if provided
-  console.log('[withdrawFromProtocol] Filtering. selectedSteps:', selectedSteps, 'allSteps count:', allSteps.length);
+  console.log(
+    '[withdrawFromProtocol] Filtering. selectedSteps:',
+    selectedSteps,
+    'allSteps count:',
+    allSteps.length,
+  );
   const baseSteps =
     selectedSteps && selectedSteps.length > 0
       ? allSteps.filter(step => {
@@ -546,10 +574,9 @@ const withdrawFromProtocol = (
                 if (fromProtocol === 'Beefy') {
                   matches = false; // Beefy uses 'beefy-to-evm' id
                 } else {
-                  matches = (
+                  matches =
                     step.src === `${fromProtocol}_${chain}` &&
-                    step.dest === `@${chain}`
-                  );
+                    step.dest === `@${chain}`;
                 }
                 break;
               case 'beefy-to-evm':
@@ -557,32 +584,43 @@ const withdrawFromProtocol = (
                 if (isBeefyProtocol(fromProtocol)) {
                   const vaultName = beefyProtocolToVault[fromProtocol];
                   const vaultChain = beefyProtocolToChain[fromProtocol];
-                  matches = (
-                    step.src === vaultName &&
-                    step.dest === `@${vaultChain}`
+                  matches =
+                    step.src === vaultName && step.dest === `@${vaultChain}`;
+                  console.log(
+                    `[Filter] Checking 'beefy-to-evm' for specific vault:`,
+                    step.src,
+                    '===',
+                    vaultName,
+                    '&&',
+                    step.dest,
+                    '=== @' + vaultChain,
+                    '→',
+                    matches,
                   );
-                  console.log(`[Filter] Checking 'beefy-to-evm' for specific vault:`, step.src, '===', vaultName, '&&', step.dest, '=== @' + vaultChain, '→', matches);
                 } else {
                   // Legacy Beefy support
-                  matches = (
+                  matches =
                     step.src === beefyVaultNames[chain] &&
-                    step.dest === `@${chain}`
+                    step.dest === `@${chain}`;
+                  console.log(
+                    `[Filter] Checking 'beefy-to-evm' for step:`,
+                    step.src,
+                    '===',
+                    beefyVaultNames[chain],
+                    '&&',
+                    step.dest,
+                    '=== @' + chain,
+                    '→',
+                    matches,
                   );
-                  console.log(`[Filter] Checking 'beefy-to-evm' for step:`, step.src, '===', beefyVaultNames[chain], '&&', step.dest, '=== @' + chain, '→', matches);
                 }
                 break;
               case 'evm-to-noble':
                 // Legacy support for old step structure
-                matches = (
-                  step.src === `@${chain}` &&
-                  step.dest === '@noble'
-                );
+                matches = step.src === `@${chain}` && step.dest === '@noble';
                 break;
               case 'evm-to-agoric':
-                matches = (
-                  step.src === `@${chain}` &&
-                  step.dest === '@agoric'
-                );
+                matches = step.src === `@${chain}` && step.dest === '@agoric';
                 break;
               case 'noble-to-agoric':
                 matches = step.src === '@noble' && step.dest === '@agoric';
@@ -604,7 +642,10 @@ const withdrawFromProtocol = (
         })
       : allSteps;
 
-  console.log('[withdrawFromProtocol] After filtering. baseSteps count:', baseSteps.length);
+  console.log(
+    '[withdrawFromProtocol] After filtering. baseSteps count:',
+    baseSteps.length,
+  );
 
   // Combine base steps with custom steps
   const steps = [...baseSteps, ...customMovements];
