@@ -140,7 +140,9 @@ export const parseUSDCAmount = (amount: string, decimals = 6): bigint => {
   const fractionalPart = parts[1] || '';
 
   // Pad or truncate fractional part to match decimals
-  const paddedFractional = fractionalPart.padEnd(decimals, '0').slice(0, decimals);
+  const paddedFractional = fractionalPart
+    .padEnd(decimals, '0')
+    .slice(0, decimals);
   const fractionalValue = BigInt(paddedFractional);
 
   const multiplier = 10n ** BigInt(decimals);
@@ -153,19 +155,21 @@ export const parseUSDCAmount = (amount: string, decimals = 6): bigint => {
  * @param allocations - Target allocations to validate
  * @throws Error if allocations are invalid
  */
-export const validateAllocations = (
-  allocations: TargetAllocation[],
-): void => {
+export const validateAllocations = (allocations: TargetAllocation[]): void => {
   if (allocations.length === 0) {
     throw new Error('At least one allocation is required');
   }
 
   for (const alloc of allocations) {
     if (alloc.portion <= 0) {
-      throw new Error(`Invalid portion for ${alloc.instrument}: must be positive`);
+      throw new Error(
+        `Invalid portion for ${alloc.instrument}: must be positive`,
+      );
     }
     if (!Number.isInteger(alloc.portion)) {
-      throw new Error(`Invalid portion for ${alloc.instrument}: must be an integer`);
+      throw new Error(
+        `Invalid portion for ${alloc.instrument}: must be an integer`,
+      );
     }
   }
 
