@@ -7,8 +7,14 @@
 
 import React, { useState } from 'react';
 import type { WalletClient } from 'viem';
-import { SignatureTransfer, type PermitTransferFrom as Permit2Transfer } from '@uniswap/permit2-sdk';
-import type { TargetAllocation, SignedOpenPortfolio } from '../evm-portfolio-types';
+import {
+  SignatureTransfer,
+  type PermitTransferFrom as Permit2Transfer,
+} from '@uniswap/permit2-sdk';
+import type {
+  TargetAllocation,
+  SignedOpenPortfolio,
+} from '../evm-portfolio-types';
 import {
   createOpenPortfolioIntent,
   getOpenPortfolioDomain,
@@ -49,7 +55,11 @@ const POOL_OPTIONS = [
   'Compound_Base',
 ];
 
-export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props) {
+export function OpenPortfolioForm({
+  userAddress,
+  walletClient,
+  onSigned,
+}: Props) {
   const [amount, setAmount] = useState('15'); // Default 15 USDC
   const [allocations, setAllocations] = useState<TargetAllocation[]>([
     { instrument: 'USDN', portion: 60 },
@@ -66,10 +76,12 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
     const fetchNetwork = async () => {
       if (window.ethereum) {
         try {
-          const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' }) as string;
+          const chainIdHex = (await window.ethereum.request({
+            method: 'eth_chainId',
+          })) as string;
           const chainId = parseInt(chainIdHex, 16);
           setCurrentChainId(chainId);
-          
+
           // Set network name based on chainId
           if (chainId === 11155111) {
             setNetworkName('Sepolia');
@@ -90,7 +102,7 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
     const handleChainChanged = (chainIdHex: string) => {
       const chainId = parseInt(chainIdHex, 16);
       setCurrentChainId(chainId);
-      
+
       if (chainId === 11155111) {
         setNetworkName('Sepolia');
       } else if (chainId === 1) {
@@ -115,10 +127,17 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
     setAllocations([...allocations, { instrument: 'USDN', portion: 0 }]);
   };
 
-  const updateAllocation = (index: number, field: keyof TargetAllocation, value: string | number) => {
+  const updateAllocation = (
+    index: number,
+    field: keyof TargetAllocation,
+    value: string | number,
+  ) => {
     const updated = [...allocations];
     if (field === 'portion') {
-      updated[index] = { ...updated[index], portion: typeof value === 'string' ? parseInt(value) || 0 : value };
+      updated[index] = {
+        ...updated[index],
+        portion: typeof value === 'string' ? parseInt(value) || 0 : value,
+      };
     } else {
       updated[index] = { ...updated[index], [field]: value };
     }
@@ -129,7 +148,10 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
     setAllocations(allocations.filter((_, i) => i !== index));
   };
 
-  const totalPortions = allocations.reduce((sum, alloc) => sum + alloc.portion, 0);
+  const totalPortions = allocations.reduce(
+    (sum, alloc) => sum + alloc.portion,
+    0,
+  );
 
   const signMessages = async () => {
     if (totalPortions === 0) {
@@ -154,15 +176,18 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
       }
 
       // Get the actual chainId from the wallet
-      const chainIdHex = await window.ethereum?.request({ method: 'eth_chainId' }) as string;
+      const chainIdHex = (await window.ethereum?.request({
+        method: 'eth_chainId',
+      })) as string;
       const chainId = parseInt(chainIdHex, 16);
 
       // Check if wallet is connected to the correct network
       if (chainId !== SEPOLIA_CONTRACTS.CHAIN_ID) {
-        const networkName = chainId === 1 ? 'Ethereum Mainnet' : `chain ${chainId}`;
+        const networkName =
+          chainId === 1 ? 'Ethereum Mainnet' : `chain ${chainId}`;
         setError(
           `Wrong network: You're connected to ${networkName} but this page requires Sepolia testnet (chain ID ${SEPOLIA_CONTRACTS.CHAIN_ID}). ` +
-          `Please switch to Sepolia in MetaMask. See: https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/`
+            `Please switch to Sepolia in MetaMask. See: https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/`,
         );
         setSigning(false);
         return;
@@ -170,7 +195,7 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
 
       // Step 1: Sign Permit2 PermitTransferFrom
       setCurrentStep('Signing Permit2 (1/2)...');
-      
+
       const now = BigInt(Math.floor(Date.now() / 1000));
       const deadline = now + ONE_HOUR_IN_SECONDS;
 
@@ -184,10 +209,21 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
         deadline,
       };
 
-      const { domain: permit2Domain, types: permit2Types, values: permit2Values } = 
-        SignatureTransfer.getPermitData(permit, SEPOLIA_CONTRACTS.PERMIT2, chainId);
+      const {
+        domain: permit2Domain,
+        types: permit2Types,
+        values: permit2Values,
+      } = SignatureTransfer.getPermitData(
+        permit,
+        SEPOLIA_CONTRACTS.PERMIT2,
+        chainId,
+      );
 
-      console.log('Permit2 signature request:', { domain: permit2Domain, types: permit2Types, values: permit2Values });
+      console.log('Permit2 signature request:', {
+        domain: permit2Domain,
+        types: permit2Types,
+        values: permit2Values,
+      });
 
       // Convert Permit2 SDK format (ethers v5) to viem format
       // The Permit2 SDK returns TypedDataDomain which needs conversion to viem's format
@@ -215,19 +251,27 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
         userAddress,
         amountInSmallestUnit,
         allocations,
-        { nonce: now, deadline, tokenAddress: SEPOLIA_CONTRACTS.USDC }
+        { nonce: now, deadline, tokenAddress: SEPOLIA_CONTRACTS.USDC },
       );
 
       const intentDomain = getOpenPortfolioDomain(chainId);
       const intentTypes = getOpenPortfolioTypes();
 
-      console.log('OpenPortfolio intent signature request:', { domain: intentDomain, types: intentTypes, message: intent });
+      console.log('OpenPortfolio intent signature request:', {
+        domain: intentDomain,
+        types: intentTypes,
+        message: intent,
+      });
 
       // Cast to viem-compatible types
       // The intentTypes are already in the correct format but TS needs explicit typing
       const intentSignature = await walletClient.signTypedData({
         account: userAddress as `0x${string}`,
-        domain: intentDomain as { name: string; version: string; chainId?: number },
+        domain: intentDomain as {
+          name: string;
+          version: string;
+          chainId?: number;
+        },
         types: intentTypes as Permit2TypesToViem,
         primaryType: 'OpenPortfolio',
         message: intent as Record<string, unknown>,
@@ -254,7 +298,8 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
       setCurrentStep('');
       onSigned(result);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to sign messages';
+      const message =
+        err instanceof Error ? err.message : 'Failed to sign messages';
       setError(message);
       console.error('Signature error:', err);
       setCurrentStep('');
@@ -268,39 +313,48 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
       <h2>Open Portfolio with Deposit</h2>
 
       {/* Network Status Info */}
-      <div style={{
-        marginBottom: '20px',
-        padding: '12px',
-        background: currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID ? '#d1ecf1' : '#fff3cd',
-        border: `1px solid ${currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID ? '#bee5eb' : '#ffeeba'}`,
-        borderRadius: '4px',
-        fontSize: '14px',
-      }}>
-        <strong>Network:</strong>{' '}
-        {networkName} (Chain ID: {currentChainId ?? 'detecting...'})
-        {currentChainId !== SEPOLIA_CONTRACTS.CHAIN_ID && currentChainId !== null && (
-          <div style={{ marginTop: '8px', color: '#856404' }}>
-            ⚠️ Please switch to <strong>Sepolia testnet</strong> to use this page.{' '}
-            <a 
-              href="https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ color: '#004085', textDecoration: 'underline' }}
-            >
-              How to add Sepolia
-            </a>
-          </div>
-        )}
+      <div
+        style={{
+          marginBottom: '20px',
+          padding: '12px',
+          background:
+            currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID
+              ? '#d1ecf1'
+              : '#fff3cd',
+          border: `1px solid ${currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID ? '#bee5eb' : '#ffeeba'}`,
+          borderRadius: '4px',
+          fontSize: '14px',
+        }}
+      >
+        <strong>Network:</strong> {networkName} (Chain ID:{' '}
+        {currentChainId ?? 'detecting...'})
+        {currentChainId !== SEPOLIA_CONTRACTS.CHAIN_ID &&
+          currentChainId !== null && (
+            <div style={{ marginTop: '8px', color: '#856404' }}>
+              ⚠️ Please switch to <strong>Sepolia testnet</strong> to use this
+              page.{' '}
+              <a
+                href="https://support.metamask.io/networks-and-sidechains/managing-networks/how-to-add-a-custom-network-rpc/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#004085', textDecoration: 'underline' }}
+              >
+                How to add Sepolia
+              </a>
+            </div>
+          )}
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        <label
+          style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
+        >
           Deposit Amount (USDC):
         </label>
         <input
           type="text"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={e => setAmount(e.target.value)}
           style={{ padding: '8px', width: '200px' }}
           placeholder="15"
           disabled={signing}
@@ -311,37 +365,56 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
+        <label
+          style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}
+        >
           Target Allocation:
         </label>
 
         {allocations.map((alloc, index) => {
-          const percentage = totalPortions > 0 
-            ? ((alloc.portion / totalPortions) * 100).toFixed(1)
-            : '0.0';
+          const percentage =
+            totalPortions > 0
+              ? ((alloc.portion / totalPortions) * 100).toFixed(1)
+              : '0.0';
 
           return (
-            <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+            <div
+              key={index}
+              style={{
+                display: 'flex',
+                gap: '10px',
+                marginBottom: '10px',
+                alignItems: 'center',
+              }}
+            >
               <select
                 value={alloc.instrument}
-                onChange={(e) => updateAllocation(index, 'instrument', e.target.value)}
+                onChange={e =>
+                  updateAllocation(index, 'instrument', e.target.value)
+                }
                 style={{ padding: '5px', flex: 1 }}
                 disabled={signing}
               >
                 {POOL_OPTIONS.map(pool => (
-                  <option key={pool} value={pool}>{pool}</option>
+                  <option key={pool} value={pool}>
+                    {pool}
+                  </option>
                 ))}
               </select>
               <input
                 type="number"
                 value={alloc.portion}
-                onChange={(e) => updateAllocation(index, 'portion', e.target.value)}
+                onChange={e =>
+                  updateAllocation(index, 'portion', e.target.value)
+                }
                 style={{ padding: '5px', width: '100px' }}
                 placeholder="Portion"
                 min="0"
                 disabled={signing}
               />
-              <span style={{ fontSize: '12px', color: '#666', minWidth: '60px' }}>
+              <span
+                style={{ fontSize: '12px', color: '#666', minWidth: '60px' }}
+              >
                 ({percentage}%)
               </span>
               <button
@@ -352,7 +425,7 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
                   color: 'white',
                   border: 'none',
                   borderRadius: '3px',
-                  cursor: signing ? 'not-allowed' : 'pointer'
+                  cursor: signing ? 'not-allowed' : 'pointer',
                 }}
                 disabled={signing}
               >
@@ -371,7 +444,7 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
             border: 'none',
             borderRadius: '3px',
             cursor: signing ? 'not-allowed' : 'pointer',
-            marginTop: '10px'
+            marginTop: '10px',
           }}
           disabled={signing}
         >
@@ -394,21 +467,23 @@ export function OpenPortfolioForm({ userAddress, walletClient, onSigned }: Props
           border: 'none',
           borderRadius: '4px',
           cursor: signing || totalPortions === 0 ? 'not-allowed' : 'pointer',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
         }}
       >
         {signing ? currentStep || 'Signing...' : 'Open Portfolio'}
       </button>
 
       {error && (
-        <div style={{
-          color: '#721c24',
-          backgroundColor: '#f8d7da',
-          border: '1px solid #f5c6cb',
-          borderRadius: '4px',
-          padding: '12px',
-          marginTop: '15px'
-        }}>
+        <div
+          style={{
+            color: '#721c24',
+            backgroundColor: '#f8d7da',
+            border: '1px solid #f5c6cb',
+            borderRadius: '4px',
+            padding: '12px',
+            marginTop: '15px',
+          }}
+        >
           <strong>Error:</strong> {error}
         </div>
       )}
