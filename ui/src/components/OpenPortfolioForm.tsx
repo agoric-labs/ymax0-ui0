@@ -27,6 +27,8 @@ import {
   createOpenPortfolioIntent,
   getOpenPortfolioDomain,
   getOpenPortfolioTypes,
+  makeOpenPortfolioSignedData,
+  OpenPortfolioTypes,
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
   validateAllocations,
@@ -38,7 +40,7 @@ const ONE_HOUR_IN_SECONDS = 3600n;
 type Permit2TypesToViem = Record<string, Array<{ name: string; type: string }>>;
 
 interface Props {
-  userAddress: string;
+  userAddress: `0x${string}`;
   walletClient: WalletClient<Transport, Chain, Account>;
   onSigned: (result: SignedOpenPortfolio) => void;
 }
@@ -62,8 +64,8 @@ export function OpenPortfolioForm({
 }: Props) {
   const [amount, setAmount] = useState<`${number}`>('15'); // Default 15 USDC
   const [allocations, setAllocations] = useState<TargetAllocation[]>([
-    { instrument: 'USDN', portion: 60 },
-    { instrument: 'Aave_Ethereum', portion: 40 },
+    { instrument: 'USDN', portion: 60n },
+    { instrument: 'Aave_Ethereum', portion: 40n },
   ]);
   const [signing, setSigning] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>('');
@@ -73,7 +75,7 @@ export function OpenPortfolioForm({
   const networkName = walletClient.chain.name;
 
   const addAllocation = () => {
-    setAllocations([...allocations, { instrument: 'USDN', portion: 0 }]);
+    setAllocations([...allocations, { instrument: 'USDN', portion: 0n }]);
   };
 
   const updateAllocation = (
@@ -86,7 +88,7 @@ export function OpenPortfolioForm({
       case 'portion':
         updated[index] = {
           ...updated[index],
-          portion: typeof value === 'string' ? parseInt(value) || 0 : value,
+          portion: BigInt(value),
         };
         break;
       case 'instrument':
@@ -101,7 +103,7 @@ export function OpenPortfolioForm({
   };
 
   const totalPortions = allocations.reduce(
-    (sum, alloc) => sum + alloc.portion,
+    (sum, alloc) => sum + Number(alloc.portion),
     0,
   );
 
@@ -185,35 +187,18 @@ export function OpenPortfolioForm({
       // Step 2: Sign OpenPortfolio intent
       setCurrentStep('Signing OpenPortfolio intent (2/2)...');
 
-      const intent = createOpenPortfolioIntent(
+      const toSign = makeOpenPortfolioSignedData(
         userAddress,
         amountInSmallestUnit,
         allocations,
-        { nonce: now, deadline, tokenAddress: SEPOLIA_CONTRACTS.USDC },
+        { nonce: now, deadline },
       );
 
-      const intentDomain = getOpenPortfolioDomain(currentChainId);
-      const intentTypes = getOpenPortfolioTypes();
-
-      console.log('OpenPortfolio intent signature request:', {
-        domain: intentDomain,
-        types: intentTypes,
-        message: intent,
-      });
+      console.log('OpenPortfolio intent signature request:', toSign);
 
       // Cast to viem-compatible types
       // The intentTypes are already in the correct format but TS needs explicit typing
-      const intentSignature = await walletClient.signTypedData({
-        account: userAddress as `0x${string}`,
-        domain: intentDomain as {
-          name: string;
-          version: string;
-          chainId?: number;
-        },
-        types: intentTypes as Permit2TypesToViem,
-        primaryType: 'OpenPortfolio',
-        message: intent as unknown as Record<string, unknown>,
-      });
+      const intentSignature = await walletClient.signTypedData(toSign);
 
       console.log('OpenPortfolio intent signature received:', intentSignature);
 
@@ -230,7 +215,7 @@ export function OpenPortfolioForm({
           nonce: permit.nonce.toString(),
           deadline: permit.deadline.toString(),
         },
-        intent,
+        intent: toSign.message,
       };
 
       setCurrentStep('');
@@ -312,7 +297,7 @@ export function OpenPortfolioForm({
         {allocations.map((alloc, index) => {
           const percentage =
             totalPortions > 0
-              ? ((alloc.portion / totalPortions) * 100).toFixed(1)
+              ? ((Number(alloc.portion) / totalPortions) * 100).toFixed(1)
               : '0.0';
 
           return (
@@ -341,7 +326,7 @@ export function OpenPortfolioForm({
               </select>
               <input
                 type="number"
-                value={alloc.portion}
+                value={Number(alloc.portion)}
                 onChange={e =>
                   updateAllocation(index, 'portion', e.target.value)
                 }

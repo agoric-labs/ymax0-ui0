@@ -69,7 +69,7 @@ const mockEVMHandler = {
 };
 
 export function EVMWalletPage() {
-  const [evmAddress, setEvmAddress] = useState('');
+  const [evmAddress, setEvmAddress] = useState<`0x${string}` | ''>('');
   const [walletClient, setWalletClient] = useState<WalletClient<
     Transport,
     Chain,
@@ -123,7 +123,8 @@ export function EVMWalletPage() {
 
       // Step 1: Ensure Permit2 allowance
       addProgress('Checking USDC allowance for Permit2...');
-      const amount = BigInt(signedData.permit.permitted.amount);
+      const { amount } = signedData.permit.permitted;
+      if (typeof amount !== 'bigint') throw RangeError(typeof amount);
 
       await ensurePermit2Allowance(
         amount,

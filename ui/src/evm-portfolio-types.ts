@@ -3,6 +3,7 @@
  */
 
 import type { PermitTransferFrom } from '@uniswap/permit2-sdk';
+import type { AbiTypeToPrimitiveType as EVM_T } from 'abitype';
 import { TypedDataDomain } from 'viem';
 
 export type { PermitTransferFrom };
@@ -18,7 +19,7 @@ export type { PermitTransferFrom };
  */
 export interface TargetAllocation {
   instrument: string;
-  portion: number; // Numerator; denominator is sum of all portions
+  portion: EVM_T<'uint256'>; // Numerator; denominator is sum of all portions
 }
 
 /**
@@ -26,8 +27,8 @@ export interface TargetAllocation {
  * Using address ensures MetaMask displays the correct token icon
  */
 export interface TokenAmount {
-  token: `0x${string}`; // ERC-20 token address (e.g., USDC)
-  amount: `${number}`; // Amount in smallest unit (e.g., "1000000" for 1 USDC with 6 decimals)
+  token: EVM_T<'address'>; // ERC-20 token address (e.g., USDC)
+  amount: EVM_T<'uint256'>; // Amount in smallest unit (e.g., 1_000_000n for 1 USDC with 6 decimals)
 }
 
 /**
@@ -38,14 +39,8 @@ export interface EIP712Domain extends TypedDataDomain {
   name: string;
   version: string;
   chainId: number;
-  verifyingContract?: `0x${string}`; // Optional: only needed if validating against a specific contract
+  verifyingContract?: EVM_T<'address'>; // Optional: only needed if validating against a specific contract
 }
-
-/**
- * EIP-712 Types definition
- * TODO: Check if viem exports a standard type for this
- */
-export type EIP712Types = Record<string, Array<{ name: string; type: string }>>;
 
 /**
  * OpenPortfolio intent message for EIP-712 signing
@@ -53,10 +48,12 @@ export type EIP712Types = Record<string, Array<{ name: string; type: string }>>;
  * Allocations are an array of Allocation structs for clear MetaMask display
  */
 export interface OpenPortfolioIntent {
-  deposit: TokenAmount; // Deposit amount with token address
-  allocations: Array<{ instrument: string; portion: `${number}` }>; // Array of allocations
-  nonce: `${number}`; // Unique nonce (typically timestamp)
-  deadline: `${number}`; // Unix timestamp
+  deposit: TokenAmount;
+  allocations: Readonly<
+    Array<{ instrument: string; portion: EVM_T<'uint256'> }>
+  >;
+  nonce: EVM_T<'uint256'>; // Unique nonce (typically timestamp)
+  deadline: EVM_T<'uint256'>; // Unix timestamp
 }
 
 /**
@@ -66,14 +63,6 @@ export interface OpenPortfolioIntent {
 export interface SignedOpenPortfolio {
   permitSignature: string;
   intentSignature: string;
-  permit: {
-    permitted: {
-      token: string;
-      amount: string;
-    };
-    spender: string;
-    nonce: string;
-    deadline: string;
-  };
+  permit: PermitTransferFrom;
   intent: OpenPortfolioIntent;
 }

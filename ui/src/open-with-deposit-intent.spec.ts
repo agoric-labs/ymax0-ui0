@@ -6,31 +6,28 @@
  * for MetaMask display.
  */
 
-import { describe, it, expect } from 'vitest';
 import { hashTypedData } from 'viem';
+import { describe, expect, it } from 'vitest';
 import type { TargetAllocation } from './evm-portfolio-types';
 import {
   createOpenPortfolioIntent,
-  getOpenPortfolioDomain,
-  getOpenPortfolioTypes,
   formatUSDCAmount,
+  getOpenPortfolioDomain,
+  OpenPortfolioTypes,
   parseUSDCAmount,
-  validateAllocations,
   SEPOLIA_CONTRACTS,
+  validateAllocations,
 } from './open-portfolio-eip712';
 
 describe('OpenPortfolio EIP-712 Intent', () => {
-  const TEST_ADDRESS = '0x1234567890123456789012345678901234567890';
-
   describe('createOpenPortfolioIntent', () => {
     it('creates valid intent structure with portion-based allocations', () => {
       const allocations: TargetAllocation[] = [
-        { instrument: 'USDN', portion: 60 },
-        { instrument: 'Aave_Ethereum', portion: 40 },
+        { instrument: 'USDN', portion: 60n },
+        { instrument: 'Aave_Ethereum', portion: 40n },
       ];
 
       const intent = createOpenPortfolioIntent(
-        TEST_ADDRESS,
         1_000_000n, // 1 USDC
         allocations,
         { nonce: 12345n, deadline: 67890n },
@@ -38,46 +35,46 @@ describe('OpenPortfolio EIP-712 Intent', () => {
 
       // Note: depositor is not in the message - it can be recovered from signature
       expect(intent.deposit.token).toBe(SEPOLIA_CONTRACTS.USDC);
-      expect(intent.deposit.amount).toBe('1000000');
-      expect(intent.nonce).toBe('12345');
-      expect(intent.deadline).toBe('67890');
+      expect(intent.deposit.amount).toBe(1000000n);
+      expect(intent.nonce).toBe(12345n);
+      expect(intent.deadline).toBe(67890n);
 
       // Verify allocations are array of structs (not JSON, not parallel arrays)
       expect(intent.allocations).toEqual([
-        { instrument: 'USDN', portion: '60' },
-        { instrument: 'Aave_Ethereum', portion: '40' },
+        { instrument: 'USDN', portion: 60n },
+        { instrument: 'Aave_Ethereum', portion: 40n },
       ]);
     });
 
     it('supports flexible portion ratios (60:40 same as 6:4)', () => {
       const allocations1: TargetAllocation[] = [
-        { instrument: 'A', portion: 60 },
-        { instrument: 'B', portion: 40 },
+        { instrument: 'A', portion: 60n },
+        { instrument: 'B', portion: 40n },
       ];
 
       const allocations2: TargetAllocation[] = [
-        { instrument: 'A', portion: 6 },
-        { instrument: 'B', portion: 4 },
+        { instrument: 'A', portion: 6n },
+        { instrument: 'B', portion: 4n },
       ];
 
-      const intent1 = createOpenPortfolioIntent(TEST_ADDRESS, 1000n, allocations1, {
+      const intent1 = createOpenPortfolioIntent(1000n, allocations1, {
         nonce: 1n,
         deadline: 100n,
       });
 
-      const intent2 = createOpenPortfolioIntent(TEST_ADDRESS, 1000n, allocations2, {
+      const intent2 = createOpenPortfolioIntent(1000n, allocations2, {
         nonce: 1n,
         deadline: 100n,
       });
 
       // Both should create valid intents with different portion values but same ratio
       expect(intent1.allocations).toEqual([
-        { instrument: 'A', portion: '60' },
-        { instrument: 'B', portion: '40' },
+        { instrument: 'A', portion: 60n },
+        { instrument: 'B', portion: 40n },
       ]);
       expect(intent2.allocations).toEqual([
-        { instrument: 'A', portion: '6' },
-        { instrument: 'B', portion: '4' },
+        { instrument: 'A', portion: 6n },
+        { instrument: 'B', portion: 4n },
       ]);
 
       // Verify ratio is the same: 60/100 === 6/10
@@ -87,9 +84,11 @@ describe('OpenPortfolio EIP-712 Intent', () => {
     });
 
     it('includes token address for MetaMask USDC icon display', () => {
-      const allocations: TargetAllocation[] = [{ instrument: 'USDN', portion: 100 }];
+      const allocations: TargetAllocation[] = [
+        { instrument: 'USDN', portion: 100n },
+      ];
 
-      const intent = createOpenPortfolioIntent(TEST_ADDRESS, 15_000_000n, allocations);
+      const intent = createOpenPortfolioIntent(15_000_000n, allocations);
 
       // Token address must be present in deposit
       expect(intent.deposit.token).toBe(SEPOLIA_CONTRACTS.USDC);
@@ -98,10 +97,12 @@ describe('OpenPortfolio EIP-712 Intent', () => {
     });
 
     it('uses default nonce and deadline if not provided', () => {
-      const allocations: TargetAllocation[] = [{ instrument: 'USDN', portion: 100 }];
+      const allocations: TargetAllocation[] = [
+        { instrument: 'USDN', portion: 100n },
+      ];
 
       const before = BigInt(Math.floor(Date.now() / 1000));
-      const intent = createOpenPortfolioIntent(TEST_ADDRESS, 1_000_000n, allocations);
+      const intent = createOpenPortfolioIntent(1_000_000n, allocations);
       const after = BigInt(Math.floor(Date.now() / 1000));
 
       const nonce = BigInt(intent.nonce);
@@ -120,25 +121,23 @@ describe('OpenPortfolio EIP-712 Intent', () => {
   describe('EIP-712 encoding and validation', () => {
     it('produces EIP-712 encodable message', () => {
       const allocations: TargetAllocation[] = [
-        { instrument: 'USDN', portion: 50 },
-        { instrument: 'Aave_Ethereum', portion: 50 },
+        { instrument: 'USDN', portion: 50n },
+        { instrument: 'Aave_Ethereum', portion: 50n },
       ];
 
-      const intent = createOpenPortfolioIntent(
-        TEST_ADDRESS,
-        1_000_000n,
-        allocations,
-        { nonce: 1n, deadline: 100n },
-      );
+      const intent = createOpenPortfolioIntent(1_000_000n, allocations, {
+        nonce: 1n,
+        deadline: 100n,
+      });
 
       const domain = getOpenPortfolioDomain(SEPOLIA_CONTRACTS.CHAIN_ID);
-      const types = getOpenPortfolioTypes();
+      const types = OpenPortfolioTypes;
 
       // Should not throw when hashing
       expect(() => {
         hashTypedData({
           domain,
-          types,
+          types: OpenPortfolioTypes,
           primaryType: 'OpenPortfolio',
           message: intent,
         });
@@ -155,34 +154,31 @@ describe('OpenPortfolio EIP-712 Intent', () => {
     });
 
     it('produces consistent hash for same input', () => {
-      const allocations: TargetAllocation[] = [{ instrument: 'USDN', portion: 100 }];
+      const allocations: TargetAllocation[] = [
+        { instrument: 'USDN', portion: 100n },
+      ];
 
-      const intent1 = createOpenPortfolioIntent(
-        TEST_ADDRESS,
-        1_000_000n,
-        allocations,
-        { nonce: 42n, deadline: 1000n },
-      );
+      const intent1 = createOpenPortfolioIntent(1_000_000n, allocations, {
+        nonce: 42n,
+        deadline: 1000n,
+      });
 
-      const intent2 = createOpenPortfolioIntent(
-        TEST_ADDRESS,
-        1_000_000n,
-        allocations,
-        { nonce: 42n, deadline: 1000n },
-      );
+      const intent2 = createOpenPortfolioIntent(1_000_000n, allocations, {
+        nonce: 42n,
+        deadline: 1000n,
+      });
 
       const domain = getOpenPortfolioDomain(SEPOLIA_CONTRACTS.CHAIN_ID);
-      const types = getOpenPortfolioTypes();
 
       const hash1 = hashTypedData({
         domain,
-        types,
+        types: OpenPortfolioTypes,
         primaryType: 'OpenPortfolio',
         message: intent1,
       });
       const hash2 = hashTypedData({
         domain,
-        types,
+        types: OpenPortfolioTypes,
         primaryType: 'OpenPortfolio',
         message: intent2,
       });
@@ -192,31 +188,27 @@ describe('OpenPortfolio EIP-712 Intent', () => {
 
     it('produces different hash for different allocations', () => {
       const allocations1: TargetAllocation[] = [
-        { instrument: 'A', portion: 60 },
-        { instrument: 'B', portion: 40 },
+        { instrument: 'A', portion: 60n },
+        { instrument: 'B', portion: 40n },
       ];
 
       const allocations2: TargetAllocation[] = [
-        { instrument: 'A', portion: 50 },
-        { instrument: 'B', portion: 50 },
+        { instrument: 'A', portion: 50n },
+        { instrument: 'B', portion: 50n },
       ];
 
-      const intent1 = createOpenPortfolioIntent(
-        TEST_ADDRESS,
-        1_000_000n,
-        allocations1,
-        { nonce: 1n, deadline: 100n },
-      );
+      const intent1 = createOpenPortfolioIntent(1_000_000n, allocations1, {
+        nonce: 1n,
+        deadline: 100n,
+      });
 
-      const intent2 = createOpenPortfolioIntent(
-        TEST_ADDRESS,
-        1_000_000n,
-        allocations2,
-        { nonce: 1n, deadline: 100n },
-      );
+      const intent2 = createOpenPortfolioIntent(1_000_000n, allocations2, {
+        nonce: 1n,
+        deadline: 100n,
+      });
 
       const domain = getOpenPortfolioDomain(SEPOLIA_CONTRACTS.CHAIN_ID);
-      const types = getOpenPortfolioTypes();
+      const types = OpenPortfolioTypes;
 
       const hash1 = hashTypedData({
         domain,
@@ -285,12 +277,7 @@ describe('OpenPortfolio EIP-712 Intent', () => {
     });
 
     it('round-trips correctly', () => {
-      const amounts = [
-        1_000_000n,
-        15_000_000n,
-        1_500_000n,
-        1_234_567n,
-      ];
+      const amounts = [1_000_000n, 15_000_000n, 1_500_000n, 1_234_567n];
 
       for (const amount of amounts) {
         const formatted = formatUSDCAmount(amount);
@@ -303,8 +290,8 @@ describe('OpenPortfolio EIP-712 Intent', () => {
   describe('validateAllocations', () => {
     it('accepts valid allocations', () => {
       const validAllocations: TargetAllocation[] = [
-        { instrument: 'A', portion: 60 },
-        { instrument: 'B', portion: 40 },
+        { instrument: 'A', portion: 60n },
+        { instrument: 'B', portion: 40n },
       ];
 
       expect(() => validateAllocations(validAllocations)).not.toThrow();
@@ -312,7 +299,7 @@ describe('OpenPortfolio EIP-712 Intent', () => {
 
     it('accepts single allocation', () => {
       const singleAllocation: TargetAllocation[] = [
-        { instrument: 'USDN', portion: 100 },
+        { instrument: 'USDN', portion: 100n },
       ];
 
       expect(() => validateAllocations(singleAllocation)).not.toThrow();
@@ -320,101 +307,108 @@ describe('OpenPortfolio EIP-712 Intent', () => {
 
     it('accepts different portion scales', () => {
       const allocations: TargetAllocation[] = [
-        { instrument: 'A', portion: 6 },
-        { instrument: 'B', portion: 4 },
+        { instrument: 'A', portion: 6n },
+        { instrument: 'B', portion: 4n },
       ];
 
       expect(() => validateAllocations(allocations)).not.toThrow();
     });
 
     it('rejects empty allocations', () => {
-      expect(() => validateAllocations([])).toThrow('At least one allocation is required');
+      expect(() => validateAllocations([])).toThrow(
+        'At least one allocation is required',
+      );
     });
 
     it('rejects zero portions', () => {
       const badAllocations: TargetAllocation[] = [
-        { instrument: 'A', portion: 0 },
+        { instrument: 'A', portion: 0n },
       ];
 
-      expect(() => validateAllocations(badAllocations)).toThrow('must be positive');
+      expect(() => validateAllocations(badAllocations)).toThrow(
+        'must be positive',
+      );
     });
 
     it('rejects negative portions', () => {
       const badAllocations: TargetAllocation[] = [
-        { instrument: 'A', portion: -10 },
+        { instrument: 'A', portion: -10n },
       ];
 
-      expect(() => validateAllocations(badAllocations)).toThrow('must be positive');
+      expect(() => validateAllocations(badAllocations)).toThrow(
+        'must be positive',
+      );
     });
 
     it('rejects non-integer portions', () => {
       const badAllocations: TargetAllocation[] = [
+        // @ts-expect-error intentional type error
         { instrument: 'A', portion: 60.5 },
       ];
 
-      expect(() => validateAllocations(badAllocations)).toThrow('must be an integer');
+      expect(() => validateAllocations(badAllocations)).toThrow(
+        'must be an integer',
+      );
     });
 
     it('rejects duplicate instruments', () => {
       const badAllocations: TargetAllocation[] = [
-        { instrument: 'A', portion: 50 },
-        { instrument: 'A', portion: 50 },
+        { instrument: 'A', portion: 50n },
+        { instrument: 'A', portion: 50n },
       ];
 
-      expect(() => validateAllocations(badAllocations)).toThrow('Duplicate instruments');
+      expect(() => validateAllocations(badAllocations)).toThrow(
+        'Duplicate instruments',
+      );
     });
   });
 
   describe('Three-instrument allocation examples', () => {
     it('handles 30:40:30 allocation', () => {
       const allocations: TargetAllocation[] = [
-        { instrument: 'USDN', portion: 30 },
-        { instrument: 'Aave_Ethereum', portion: 40 },
-        { instrument: 'Compound_Arbitrum', portion: 30 },
+        { instrument: 'USDN', portion: 30n },
+        { instrument: 'Aave_Ethereum', portion: 40n },
+        { instrument: 'Compound_Arbitrum', portion: 30n },
       ];
 
-      const intent = createOpenPortfolioIntent(
-        TEST_ADDRESS,
-        1_000_000n,
-        allocations,
-        { nonce: 1n, deadline: 100n },
-      );
+      const intent = createOpenPortfolioIntent(1_000_000n, allocations, {
+        nonce: 1n,
+        deadline: 100n,
+      });
 
       expect(intent.allocations).toEqual([
-        { instrument: 'USDN', portion: '30' },
-        { instrument: 'Aave_Ethereum', portion: '40' },
-        { instrument: 'Compound_Arbitrum', portion: '30' },
+        { instrument: 'USDN', portion: 30n },
+        { instrument: 'Aave_Ethereum', portion: 40n },
+        { instrument: 'Compound_Arbitrum', portion: 30n },
       ]);
 
       // Verify total portions
-      const total = intent.allocations.reduce((sum, a) => sum + parseInt(a.portion), 0);
-      expect(total).toBe(100);
+      const total = intent.allocations.reduce((sum, a) => sum + a.portion, 0n);
+      expect(total).toBe(100n);
     });
 
     it('handles 3:4:3 allocation (same ratio as 30:40:30)', () => {
       const allocations: TargetAllocation[] = [
-        { instrument: 'USDN', portion: 3 },
-        { instrument: 'Aave_Ethereum', portion: 4 },
-        { instrument: 'Compound_Arbitrum', portion: 3 },
+        { instrument: 'USDN', portion: 3n },
+        { instrument: 'Aave_Ethereum', portion: 4n },
+        { instrument: 'Compound_Arbitrum', portion: 3n },
       ];
 
       validateAllocations(allocations); // Should not throw
 
-      const intent = createOpenPortfolioIntent(
-        TEST_ADDRESS,
-        1_000_000n,
-        allocations,
-        { nonce: 1n, deadline: 100n },
-      );
+      const intent = createOpenPortfolioIntent(1_000_000n, allocations, {
+        nonce: 1n,
+        deadline: 100n,
+      });
 
       expect(intent.allocations).toEqual([
-        { instrument: 'USDN', portion: '3' },
-        { instrument: 'Aave_Ethereum', portion: '4' },
-        { instrument: 'Compound_Arbitrum', portion: '3' },
+        { instrument: 'USDN', portion: 3n },
+        { instrument: 'Aave_Ethereum', portion: 4n },
+        { instrument: 'Compound_Arbitrum', portion: 3n },
       ]);
-      
-      const total = intent.allocations.reduce((sum, a) => sum + parseInt(a.portion), 0);
-      expect(total).toBe(10);
+
+      const total = intent.allocations.reduce((sum, a) => sum + a.portion, 0n);
+      expect(total).toBe(10n);
 
       // Verify ratios are equivalent
       expect(3 / 10).toBeCloseTo(30 / 100);

@@ -2,13 +2,15 @@
  * EIP-712 utilities for OpenPortfolio intent and Permit2 signatures
  */
 
+import { TypedDataParameter } from 'viem';
+import { SignTypedDataParameters } from 'viem/actions';
 import type {
   EIP712Domain,
-  EIP712Types,
   OpenPortfolioIntent,
   TargetAllocation,
   TokenAmount,
 } from './evm-portfolio-types';
+import { sepolia } from 'viem/chains';
 
 /**
  * Contract addresses for Sepolia testnet
@@ -39,7 +41,7 @@ export const getOpenPortfolioDomain = (chainId: number): EIP712Domain => ({
 /**
  * Get EIP-712 types for OpenPortfolio intent
  */
-export const getOpenPortfolioTypes = (): EIP712Types => ({
+export const OpenPortfolioTypes = {
   OpenPortfolio: [
     { name: 'deposit', type: 'TokenAmount' },
     { name: 'allocations', type: 'Allocation[]' },
@@ -54,7 +56,7 @@ export const getOpenPortfolioTypes = (): EIP712Types => ({
     { name: 'instrument', type: 'string' },
     { name: 'portion', type: 'uint256' },
   ],
-});
+} as const satisfies Record<string, readonly TypedDataParameter[]>;
 
 /**
  * Create OpenPortfolio intent message for EIP-712 signing
@@ -62,46 +64,55 @@ export const getOpenPortfolioTypes = (): EIP712Types => ({
  * Note: depositorAddress parameter is kept for validation but not included in the message.
  * The depositor can be recovered from the signature using ecRecover.
  *
- * @param depositorAddress - EVM address of the user (0x...) - used for validation only
  * @param depositAmount - Amount to deposit in smallest unit (e.g., 1000000 for 1 USDC)
  * @param allocations - Target allocations with portions
  * @param options - Optional nonce and deadline (defaults provided)
  * @returns EIP-712 message ready for signing
  */
 export const createOpenPortfolioIntent = (
-  depositorAddress: string,
   depositAmount: bigint,
   allocations: TargetAllocation[],
   options: {
     nonce?: bigint;
     deadline?: bigint;
-    tokenAddress: string;
-  } = { tokenAddress: SEPOLIA_CONTRACTS.USDC },
+    tokenAddress?: `0x${string}`;
+  } = {},
 ): OpenPortfolioIntent => {
-  const now = BigInt(Math.floor(Date.now() / 1000));
   const {
-    nonce = now,
-    deadline = now + ONE_HOUR_IN_SECONDS,
-    tokenAddress,
+    nonce = BigInt(Math.floor(Date.now() / 1000)), // XXX ambient Date.now()
+    deadline = nonce + ONE_HOUR_IN_SECONDS,
+    tokenAddress = SEPOLIA_CONTRACTS.USDC,
   } = options;
 
-  // Convert allocations to EIP-712 compatible format
-  // Arrays of structs are supported in EIP-712 (dynamic struct fields are not)
-  const allocationsFormatted = allocations.map(a => ({
-    instrument: a.instrument,
-    portion: `${a.portion}` as `${number}`,
-  }));
+  const deposit: TokenAmount = { token: tokenAddress, amount: depositAmount };
 
-  const deposit: TokenAmount = {
-    token: tokenAddress as `0x${string}`,
-    amount: `${depositAmount}` as `${number}`,
-  };
+  return { deposit, allocations, nonce, deadline };
+};
 
+export const makeOpenPortfolioSignedData = (
+  account: `0x${string}`,
+  depositAmount: bigint,
+  allocations: TargetAllocation[],
+  options: {
+    nonce?: bigint;
+    deadline?: bigint;
+    tokenAddress?: `0x${string}`;
+    chainId?: number;
+  } = {},
+): SignTypedDataParameters<typeof OpenPortfolioTypes, 'OpenPortfolio'> => {
+  const { tokenAddress = SEPOLIA_CONTRACTS.USDC, chainId = sepolia.id } =
+    options;
+  const domain = getOpenPortfolioDomain(chainId);
+  const message = createOpenPortfolioIntent(depositAmount, allocations, {
+    ...options,
+    tokenAddress,
+  });
   return {
-    deposit,
-    allocations: allocationsFormatted,
-    nonce: `${nonce}` as `${number}`,
-    deadline: `${deadline}` as `${number}`,
+    account,
+    domain,
+    types: OpenPortfolioTypes,
+    primaryType: 'OpenPortfolio',
+    message,
   };
 };
 
@@ -163,14 +174,14 @@ export const validateAllocations = (allocations: TargetAllocation[]): void => {
   }
 
   for (const alloc of allocations) {
-    if (alloc.portion <= 0) {
-      throw new Error(
-        `Invalid portion for ${alloc.instrument}: must be positive`,
-      );
-    }
-    if (!Number.isInteger(alloc.portion)) {
+    if (typeof alloc.portion !== 'bigint') {
       throw new Error(
         `Invalid portion for ${alloc.instrument}: must be an integer`,
+      );
+    }
+    if (alloc.portion <= 0n) {
+      throw new Error(
+        `Invalid portion for ${alloc.instrument}: must be positive`,
       );
     }
   }

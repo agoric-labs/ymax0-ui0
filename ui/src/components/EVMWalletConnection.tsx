@@ -16,7 +16,7 @@ import { sepolia } from 'viem/chains';
 
 interface Props {
   address: string;
-  onAddressChange: (address: string) => void;
+  onAddressChange: (address: `0x${string}` | '') => void;
   onClientChange: (
     client: WalletClient<Transport, Chain, Account> | null,
   ) => void;
@@ -70,7 +70,7 @@ export function EVMWalletConnection({
           chain: sepolia,
         });
 
-        onAddressChange(accounts[0]);
+        onAddressChange(accounts[0] as `0x${string}`);
         onClientChange(client);
       } else {
         setError('No accounts found. Please unlock MetaMask.');

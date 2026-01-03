@@ -270,10 +270,10 @@ export const invokeFactoryDirect = async (
     permit: {
       permitted: {
         token: signedData.permit.permitted.token as Address,
-        amount: BigInt(signedData.permit.permitted.amount),
+        amount: signedData.permit.permitted.amount as bigint,
       },
-      nonce: BigInt(signedData.permit.nonce),
-      deadline: BigInt(signedData.permit.deadline),
+      nonce: signedData.permit.nonce as bigint,
+      deadline: signedData.permit.deadline as bigint,
     },
     signature: signature2098,
   });
