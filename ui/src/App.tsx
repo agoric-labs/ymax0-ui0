@@ -1090,9 +1090,14 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<MainPage />} />
-      <PublicClientContext.Provider value={sepoliaPublicClient}>
-        <Route path="/evm-wallet" element={<EVMWalletPage />} />
-      </PublicClientContext.Provider>
+      <Route
+        path="/evm-wallet"
+        element={
+          <PublicClientContext.Provider value={sepoliaPublicClient}>
+            <EVMWalletPage />
+          </PublicClientContext.Provider>
+        }
+      />
       <Route
         path="/admin"
         element={

@@ -125,7 +125,11 @@ export function EVMWalletPage() {
       addProgress('Checking USDC allowance for Permit2...');
       const amount = BigInt(signedData.permit.permitted.amount);
 
-      await ensurePermit2Allowance(walletClient, amount, addProgress);
+      await ensurePermit2Allowance(
+        amount,
+        { wallet: walletClient, public: publicClient },
+        addProgress,
+      );
 
       // Step 2: Invoke Factory.testExecute
       addProgress('Invoking Factory.testExecute on Sepolia...');
