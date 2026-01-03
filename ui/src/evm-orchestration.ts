@@ -101,6 +101,34 @@ export const toEip2098 = (signature65: `0x${string}`): `0x${string}` => {
   return `0x${r}${vsHex}`;
 };
 
+export const createAndDepositParams = [
+  {
+    type: 'tuple',
+    name: 'p',
+    components: [
+      { name: 'ownerStr', type: 'string' },
+      { name: 'tokenOwner', type: 'address' },
+      {
+        name: 'permit',
+        type: 'tuple',
+        components: [
+          {
+            name: 'permitted',
+            type: 'tuple',
+            components: [
+              { name: 'token', type: 'address' },
+              { name: 'amount', type: 'uint256' },
+            ],
+          },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      },
+      { name: 'signature', type: 'bytes' },
+    ],
+  },
+] as const;
+
 /**
  * Build the CreateAndDepositPayload for Factory.testExecute
  *
@@ -126,50 +154,9 @@ export const buildCreateAndDepositPayload = ({
   };
   signature: `0x${string}`;
 }): `0x${string}` => {
-  const abiEncodedData = encodeAbiParameters(
-    [
-      {
-        type: 'tuple',
-        name: 'p',
-        components: [
-          { name: 'ownerStr', type: 'string' },
-          { name: 'tokenOwner', type: 'address' },
-          {
-            name: 'permit',
-            type: 'tuple',
-            components: [
-              {
-                name: 'permitted',
-                type: 'tuple',
-                components: [
-                  { name: 'token', type: 'address' },
-                  { name: 'amount', type: 'uint256' },
-                ],
-              },
-              { name: 'nonce', type: 'uint256' },
-              { name: 'deadline', type: 'uint256' },
-            ],
-          },
-          { name: 'signature', type: 'bytes' },
-        ],
-      },
-    ],
-    [
-      {
-        ownerStr,
-        tokenOwner,
-        permit: {
-          permitted: {
-            token: permit.permitted.token,
-            amount: permit.permitted.amount,
-          },
-          nonce: permit.nonce,
-          deadline: permit.deadline,
-        },
-        signature,
-      },
-    ],
-  );
+  const abiEncodedData = encodeAbiParameters(createAndDepositParams, [
+    { ownerStr, tokenOwner, permit, signature },
+  ]);
 
   return abiEncodedData;
 };
@@ -270,10 +257,10 @@ export const invokeFactoryDirect = async (
     permit: {
       permitted: {
         token: signedData.permit.permitted.token as Address,
-        amount: signedData.permit.permitted.amount as bigint,
+        amount: BigInt(signedData.permit.permitted.amount as string),
       },
-      nonce: signedData.permit.nonce as bigint,
-      deadline: signedData.permit.deadline as bigint,
+      nonce: BigInt(signedData.permit.nonce as string),
+      deadline: BigInt(signedData.permit.deadline as string),
     },
     signature: signature2098,
   });

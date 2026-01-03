@@ -24,11 +24,7 @@ import type {
   TargetAllocation,
 } from '../evm-portfolio-types';
 import {
-  createOpenPortfolioIntent,
-  getOpenPortfolioDomain,
-  getOpenPortfolioTypes,
   makeOpenPortfolioSignedData,
-  OpenPortfolioTypes,
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
   validateAllocations,
@@ -107,7 +103,7 @@ export function OpenPortfolioForm({
     0,
   );
 
-  const signMessages = async (when: number) => {
+  const signMessages = async (timeStamp: number) => {
     if (totalPortions === 0) {
       setError('Total allocation must be greater than zero');
       return;
@@ -144,8 +140,9 @@ export function OpenPortfolioForm({
       // Step 1: Sign Permit2 PermitTransferFrom
       setCurrentStep('Signing Permit2 (1/2)...');
 
-      const now = BigInt(Math.floor(when / 1000));
-      const deadline = now + ONE_HOUR_IN_SECONDS;
+      const deadline =
+        BigInt(Math.floor(Date.now() / 1000)) + ONE_HOUR_IN_SECONDS;
+      const nonce = BigInt(`${timeStamp}`.replace(/[^0-9]/g, ''));
 
       const permit: Permit2Transfer = {
         permitted: {
@@ -153,7 +150,7 @@ export function OpenPortfolioForm({
           amount: amountInSmallestUnit,
         },
         spender: SEPOLIA_CONTRACTS.FACTORY,
-        nonce: now,
+        nonce,
         deadline,
       };
 
@@ -191,7 +188,7 @@ export function OpenPortfolioForm({
         userAddress,
         amountInSmallestUnit,
         allocations,
-        { nonce: now, deadline },
+        { nonce, deadline },
       );
 
       console.log('OpenPortfolio intent signature request:', toSign);
