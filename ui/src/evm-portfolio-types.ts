@@ -78,9 +78,8 @@ export interface CreateWalletWitness {
  */
 export interface SignedOpenPortfolio {
   permitSignature: string;
-  intentSignature: string;
   permit: PermitBatchTransferFrom;
   intent: OpenPortfolioIntent;
   witness: `0x${string}`;
-  witnessTypeString: string;
+  // not needed? witnessTypeString: string;
 }

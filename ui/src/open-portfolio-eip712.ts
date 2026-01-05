@@ -206,9 +206,16 @@ export const validateAllocations = (allocations: TargetAllocation[]): void => {
  */
 export const WITNESS_TYPE = {
   CreateWallet: [
-    { name: 'owner', type: 'string' },
-    { name: 'chainId', type: 'uint256' },
-    { name: 'factory', type: 'address' },
+    { name: 'allocations', type: 'Allocation[]' },
+    { name: 'nonce', type: 'uint256' },
+    // note: chainId is in permit2 domain; factory address is spender in message
+
+    // UX / legibility ideas, to confirm with product
+    { name: 'operation', type: 'string' },
+  ],
+  Allocation: [
+    { name: 'instrument', type: 'string' },
+    { name: 'portion', type: 'uint256' },
   ],
 };
 
@@ -218,20 +225,3 @@ export const WITNESS_TYPE = {
  */
 export const WITNESS_TYPE_STRING =
   'CreateWallet witness)CreateWallet(string owner,uint256 chainId,address factory)TokenPermissions(address token,uint256 amount)' as const;
-
-/**
- * Create witness data object
- *
- * @param owner - Agoric smart wallet owner address
- * @param chainId - EVM chain ID
- * @param factory - Factory contract address
- */
-export const createWitnessData = (
-  owner: string,
-  chainId: bigint,
-  factory: `0x${string}`,
-) => ({
-  owner,
-  chainId,
-  factory,
-});

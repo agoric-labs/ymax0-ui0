@@ -10,8 +10,9 @@ import {
   SignatureTransfer,
   type PermitTransferFrom as Permit2Transfer,
 } from '@uniswap/permit2-sdk';
-import { useState } from 'react';
+import { TypedDataToPrimitiveTypes } from 'abitype';
 import { TypedDataEncoder } from 'ethers';
+import { useState } from 'react';
 import type {
   Account,
   Chain,
@@ -25,13 +26,11 @@ import type {
   TargetAllocation,
 } from '../evm-portfolio-types';
 import {
-  createWitnessData,
-  WITNESS_TYPE,
-  WITNESS_TYPE_STRING,
   makeOpenPortfolioSignedData,
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
   validateAllocations,
+  WITNESS_TYPE,
 } from '../open-portfolio-eip712';
 
 // Constants
@@ -158,11 +157,24 @@ export function OpenPortfolioForm({
         deadline,
       };
 
-      const witnessData = createWitnessData(
-        'agoric1temporary',
-        BigInt(currentChainId),
-        SEPOLIA_CONTRACTS.FACTORY,
+      // 1. version
+      // 2. nonce (also offerId)
+      // 3. operation / method
+      // 4. operation-specific: targetAlocation
+
+      const toSign = makeOpenPortfolioSignedData(
+        userAddress,
+        amountInSmallestUnit,
+        allocations,
+        { nonce, deadline },
       );
+
+      // TODO: work out types
+      const witnessData = {
+        nonce,
+        allocations,
+        operation: 'createYmaxPortfolio',
+      };
 
       const {
         domain: permit2Domain,
@@ -202,28 +214,9 @@ export function OpenPortfolioForm({
 
       console.log('Permit2 signature received:', permitSignature);
 
-      // Step 2: Sign OpenPortfolio intent
-      setCurrentStep('Signing OpenPortfolio intent (2/2)...');
-
-      const toSign = makeOpenPortfolioSignedData(
-        userAddress,
-        amountInSmallestUnit,
-        allocations,
-        { nonce, deadline },
-      );
-
-      console.log('OpenPortfolio intent signature request:', toSign);
-
-      // Cast to viem-compatible types
-      // The intentTypes are already in the correct format but TS needs explicit typing
-      const intentSignature = await walletClient.signTypedData(toSign);
-
-      console.log('OpenPortfolio intent signature received:', intentSignature);
-
       // Combine results
       const result: SignedOpenPortfolio = {
         permitSignature,
-        intentSignature,
         permit: {
           permitted: [
             {
@@ -237,7 +230,7 @@ export function OpenPortfolioForm({
         },
         intent: toSign.message,
         witness,
-        witnessTypeString: WITNESS_TYPE_STRING,
+        // witnessTypeString: WITNESS_TYPE_STRING,
       };
 
       setCurrentStep('');
