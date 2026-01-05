@@ -225,10 +225,12 @@ export function OpenPortfolioForm({
         permitSignature,
         intentSignature,
         permit: {
-          permitted: {
-            token: permit.permitted.token,
-            amount: permit.permitted.amount.toString(),
-          },
+          permitted: [
+            {
+              token: permit.permitted.token,
+              amount: permit.permitted.amount.toString(),
+            },
+          ],
           spender: permit.spender,
           nonce: permit.nonce.toString(),
           deadline: permit.deadline.toString(),

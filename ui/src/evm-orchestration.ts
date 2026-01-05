@@ -114,7 +114,7 @@ export const createAndDepositParams = [
         components: [
           {
             name: 'permitted',
-            type: 'tuple',
+            type: 'tuple[]', // Array of tokens for PermitBatchTransferFrom
             components: [
               { name: 'token', type: 'address' },
               { name: 'amount', type: 'uint256' },
@@ -138,7 +138,7 @@ export const createAndDepositParams = [
  * The payload includes:
  * - ownerStr: Agoric address (e.g., "agoric1...")
  * - tokenOwner: EVM address of the token owner (EOA)
- * - permit: Permit2 PermitTransferFrom data
+ * - permit: Permit2 PermitBatchTransferFrom data (array of permitted tokens)
  * - witness: EIP-712 hash of witness data
  * - witnessTypeString: Permit2 witness type string
  * - signature: EIP-2098 compact signature (64 bytes)
@@ -154,7 +154,7 @@ export const buildCreateAndDepositPayload = ({
   ownerStr: string;
   tokenOwner: Address;
   permit: {
-    permitted: { token: Address; amount: bigint };
+    permitted: Array<{ token: Address; amount: bigint }>;
     nonce: bigint;
     deadline: bigint;
   };
@@ -263,10 +263,10 @@ export const invokeFactoryDirect = async (
     ownerStr,
     tokenOwner: address,
     permit: {
-      permitted: {
-        token: signedData.permit.permitted.token as Address,
-        amount: BigInt(signedData.permit.permitted.amount as string),
-      },
+      permitted: signedData.permit.permitted.map(p => ({
+        token: p.token as Address,
+        amount: BigInt(p.amount as string),
+      })),
       nonce: BigInt(signedData.permit.nonce as string),
       deadline: BigInt(signedData.permit.deadline as string),
     },

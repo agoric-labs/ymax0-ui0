@@ -69,10 +69,12 @@ test('buildCreateAndDepositPayload encodes correctly', ({ expect }) => {
     ownerStr: 'agoric1test123',
     tokenOwner: '0x1234567890123456789012345678901234567890',
     permit: {
-      permitted: {
-        token: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
-        amount: 1000000n,
-      },
+      permitted: [
+        {
+          token: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
+          amount: 1000000n,
+        },
+      ],
       nonce: 1234567890n,
       deadline: 9999999999n,
     },
@@ -98,10 +100,12 @@ test('buildCreateAndDepositPayload includes all fields', ({ expect }) => {
     ownerStr,
     tokenOwner: tokenOwner as `0x${string}`,
     permit: {
-      permitted: {
-        token: token as `0x${string}`,
-        amount: 5000000n,
-      },
+      permitted: [
+        {
+          token: token as `0x${string}`,
+          amount: 5000000n,
+        },
+      ],
       nonce: 1111111111n,
       deadline: 8888888888n,
     },
@@ -125,21 +129,25 @@ test('buildCreateAndDepositPayload includes all fields', ({ expect }) => {
 
 test('encode and decode payload with witness', ({ expect }) => {
   // see https://sepolia.etherscan.io/tx/0x094db36eaaa9b790b1f1a95e31d03009522ccc3d7221a4b2df672f4f5efd022d
+  // Real signature from transaction (converted to EIP-2098 compact format)
   const testData = {
     ownerStr: 'agoric1y3e3mlnrkuh6j2qcnlrtap42j8mzw240vwr78j',
     tokenOwner: '0x8Cb4b25E77844fC0632aCa14f1f9B23bdd654EbF' as `0x${string}`,
     permit: {
-      permitted: {
-        token: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
-        amount: 100000n,
-      },
+      permitted: [
+        {
+          token: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
+          amount: 100000n,
+        },
+      ],
       nonce: 1766597619n,
       deadline: 1766601219n,
     },
     witness:
       '0xd443041db7847869b49b13ecc501a79cae10a56e8e2370af011c918ac9802541' as `0x${string}`,
     witnessTypeString: WITNESS_TYPE_STRING,
-    signature: ('0x' + 'ab'.repeat(64)) as `0x${string}`,
+    signature:
+      '0x8af0074ab3d12e5c53146aa5ac231822384c001ffeff512a4d83b2c9805bcb6b832e7d6896928733ebcf3537dfb1d73ba30f52e21cef12747d70aa8f3afe2d28' as `0x${string}`,
   };
 
   // Encode

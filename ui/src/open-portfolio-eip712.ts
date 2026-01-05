@@ -210,7 +210,7 @@ export const WITNESS_TYPE = {
     { name: 'chainId', type: 'uint256' },
     { name: 'factory', type: 'address' },
   ],
-} as const;
+};
 
 /**
  * Witness type string for Permit2

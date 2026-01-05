@@ -2,11 +2,14 @@
  * Types for EVM wallet portfolio integration with EIP-712 signatures
  */
 
-import type { PermitTransferFrom } from '@uniswap/permit2-sdk';
+import type {
+  PermitTransferFrom,
+  PermitBatchTransferFrom,
+} from '@uniswap/permit2-sdk';
 import type { AbiTypeToPrimitiveType as EVM_T } from 'abitype';
 import { TypedDataDomain } from 'viem';
 
-export type { PermitTransferFrom };
+export type { PermitTransferFrom, PermitBatchTransferFrom };
 
 /**
  * Target allocation for portfolio positions.
@@ -71,12 +74,12 @@ export interface CreateWalletWitness {
 
 /**
  * Combined signed data for submission
- * Uses standard Permit2 PermitTransferFrom type
+ * Uses Permit2 PermitBatchTransferFrom type (array of permitted tokens)
  */
 export interface SignedOpenPortfolio {
   permitSignature: string;
   intentSignature: string;
-  permit: PermitTransferFrom;
+  permit: PermitBatchTransferFrom;
   intent: OpenPortfolioIntent;
   witness: `0x${string}`;
   witnessTypeString: string;

@@ -123,7 +123,7 @@ export function EVMWalletPage() {
 
       // Step 1: Ensure Permit2 allowance
       addProgress('Checking USDC allowance for Permit2...');
-      const amount = BigInt(signedData.permit.permitted.amount as string);
+      const amount = BigInt(signedData.permit.permitted[0].amount as string);
 
       await ensurePermit2Allowance(
         amount,
