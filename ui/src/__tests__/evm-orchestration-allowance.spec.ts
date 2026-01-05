@@ -13,7 +13,7 @@ import { test } from 'vitest';
 import { createPublicClient, createWalletClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { ensurePermit2Allowance } from './evm-orchestration';
+import { ensurePermit2Allowance } from '../evm-orchestration';
 
 test('ensurePermit2Allowance should query allowance from publicClient', async ({
   expect,

@@ -7,9 +7,9 @@ import {
   toEip2098,
   buildCreateAndDepositPayload,
   createAndDepositParams,
-} from './evm-orchestration';
+} from '../evm-orchestration';
 import { decodeAbiParameters } from 'viem';
-import { SEPOLIA_CONTRACTS } from './open-portfolio-eip712.ts';
+import { SEPOLIA_CONTRACTS } from '../open-portfolio-eip712';
 
 test('toEip2098 converts 65-byte signature to 64-byte compact', ({
   expect,
