@@ -2,10 +2,10 @@ import '@endo/init';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import Admin from './Admin';
+import Admin from '../Admin';
 
 // Mock config functions
-vi.mock('../config', () => ({
+vi.mock('../../config', () => ({
   getInitialEnvironment: () => 'devnet',
   configureEndpoints: () => ({ 
     API: 'https://devnet.api.agoric.net',
@@ -36,7 +36,7 @@ vi.mock('@agoric/client-utils', () => ({
 }));
 
 // Mock wallet entry proxy
-vi.mock('../walletEntryProxy', () => ({
+vi.mock('../../walletEntryProxy', () => ({
   reifyWalletEntry: vi.fn(() => ({
     target: {},
     tools: { setName: vi.fn() }

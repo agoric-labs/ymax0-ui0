@@ -192,3 +192,46 @@ export const validateAllocations = (allocations: TargetAllocation[]): void => {
     throw new Error('Duplicate instruments in allocations');
   }
 };
+
+/**
+ * Witness utilities for Permit2 signatures
+ *
+ * TODO: Witness parameters are preliminary and may need adjustments
+ * based on final contract requirements. See createAndDeposit.ts for reference.
+ */
+
+/**
+ * Witness type definition for EIP-712
+ * This defines the structure of the witness data
+ */
+export const WITNESS_TYPE = {
+  CreateWallet: [
+    { name: 'owner', type: 'string' },
+    { name: 'chainId', type: 'uint256' },
+    { name: 'factory', type: 'address' },
+  ],
+};
+
+/**
+ * Witness type string for Permit2
+ * Format: "[WitnessType] witness)[WitnessTypeDefinition]TokenPermissions(address token,uint256 amount)"
+ */
+export const WITNESS_TYPE_STRING =
+  'CreateWallet witness)CreateWallet(string owner,uint256 chainId,address factory)TokenPermissions(address token,uint256 amount)' as const;
+
+/**
+ * Create witness data object
+ *
+ * @param owner - Agoric smart wallet owner address
+ * @param chainId - EVM chain ID
+ * @param factory - Factory contract address
+ */
+export const createWitnessData = (
+  owner: string,
+  chainId: bigint,
+  factory: `0x${string}`,
+) => ({
+  owner,
+  chainId,
+  factory,
+});

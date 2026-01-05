@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatActionColumn } from './Admin.utils.tsx';
+import { formatActionColumn } from '../Admin.utils';
 import React from 'react';
 
 const mockInvokeEntryMessage = {

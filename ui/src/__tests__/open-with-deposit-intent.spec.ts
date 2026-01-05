@@ -8,7 +8,7 @@
 
 import { hashTypedData } from 'viem';
 import { describe, expect, it } from 'vitest';
-import type { TargetAllocation } from './evm-portfolio-types';
+import type { TargetAllocation } from '../evm-portfolio-types';
 import {
   createOpenPortfolioIntent,
   formatUSDCAmount,
@@ -17,7 +17,7 @@ import {
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
   validateAllocations,
-} from './open-portfolio-eip712';
+} from '../open-portfolio-eip712';
 
 describe('OpenPortfolio EIP-712 Intent', () => {
   describe('createOpenPortfolioIntent', () => {

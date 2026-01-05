@@ -2,11 +2,14 @@
  * Types for EVM wallet portfolio integration with EIP-712 signatures
  */
 
-import type { PermitTransferFrom } from '@uniswap/permit2-sdk';
+import type {
+  PermitTransferFrom,
+  PermitBatchTransferFrom,
+} from '@uniswap/permit2-sdk';
 import type { AbiTypeToPrimitiveType as EVM_T } from 'abitype';
 import { TypedDataDomain } from 'viem';
 
-export type { PermitTransferFrom };
+export type { PermitTransferFrom, PermitBatchTransferFrom };
 
 /**
  * Target allocation for portfolio positions.
@@ -57,12 +60,27 @@ export interface OpenPortfolioIntent {
 }
 
 /**
+ * Witness data for Permit2 signature
+ * Adds additional validated data to the permit signature
+ *
+ * TODO: This witness structure is preliminary and may change based on
+ * final Factory contract requirements. See createAndDeposit.ts for reference.
+ */
+export interface CreateWalletWitness {
+  owner: string; // Agoric smart wallet owner address
+  chainId: EVM_T<'uint256'>; // EVM chain ID
+  factory: EVM_T<'address'>; // Factory contract address
+}
+
+/**
  * Combined signed data for submission
- * Uses standard Permit2 PermitTransferFrom type
+ * Uses Permit2 PermitBatchTransferFrom type (array of permitted tokens)
  */
 export interface SignedOpenPortfolio {
   permitSignature: string;
   intentSignature: string;
-  permit: PermitTransferFrom;
+  permit: PermitBatchTransferFrom;
   intent: OpenPortfolioIntent;
+  witness: `0x${string}`;
+  witnessTypeString: string;
 }
