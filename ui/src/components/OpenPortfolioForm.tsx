@@ -11,6 +11,7 @@ import {
   type PermitTransferFrom as Permit2Transfer,
 } from '@uniswap/permit2-sdk';
 import { useState } from 'react';
+import { TypedDataEncoder } from 'ethers';
 import type {
   Account,
   Chain,
@@ -24,6 +25,9 @@ import type {
   TargetAllocation,
 } from '../evm-portfolio-types';
 import {
+  createWitnessData,
+  WITNESS_TYPE,
+  WITNESS_TYPE_STRING,
   makeOpenPortfolioSignedData,
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
@@ -154,6 +158,12 @@ export function OpenPortfolioForm({
         deadline,
       };
 
+      const witnessData = createWitnessData(
+        'agoric1temporary',
+        BigInt(currentChainId),
+        SEPOLIA_CONTRACTS.FACTORY,
+      );
+
       const {
         domain: permit2Domain,
         types: permit2Types,
@@ -162,8 +172,19 @@ export function OpenPortfolioForm({
         permit,
         SEPOLIA_CONTRACTS.PERMIT2,
         currentChainId,
-        // TODO: Witness
+        {
+          witness: witnessData,
+          witnessTypeName: 'CreateWallet',
+          witnessType: WITNESS_TYPE,
+        },
       ) as PermitTransferFromData;
+
+      // Hash witness for contract payload
+      const witness = TypedDataEncoder.hashStruct(
+        'CreateWallet',
+        WITNESS_TYPE,
+        witnessData,
+      ) as `0x${string}`;
 
       console.log('Permit2 signature request:', {
         domain: permit2Domain,
@@ -213,6 +234,8 @@ export function OpenPortfolioForm({
           deadline: permit.deadline.toString(),
         },
         intent: toSign.message,
+        witness,
+        witnessTypeString: WITNESS_TYPE_STRING,
       };
 
       setCurrentStep('');

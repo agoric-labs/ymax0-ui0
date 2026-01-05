@@ -57,6 +57,19 @@ export interface OpenPortfolioIntent {
 }
 
 /**
+ * Witness data for Permit2 signature
+ * Adds additional validated data to the permit signature
+ *
+ * TODO: This witness structure is preliminary and may change based on
+ * final Factory contract requirements. See createAndDeposit.ts for reference.
+ */
+export interface CreateWalletWitness {
+  owner: string; // Agoric smart wallet owner address
+  chainId: EVM_T<'uint256'>; // EVM chain ID
+  factory: EVM_T<'address'>; // Factory contract address
+}
+
+/**
  * Combined signed data for submission
  * Uses standard Permit2 PermitTransferFrom type
  */
@@ -65,4 +78,6 @@ export interface SignedOpenPortfolio {
   intentSignature: string;
   permit: PermitTransferFrom;
   intent: OpenPortfolioIntent;
+  witness: `0x${string}`;
+  witnessTypeString: string;
 }

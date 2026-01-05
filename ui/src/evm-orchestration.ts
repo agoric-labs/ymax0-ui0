@@ -124,6 +124,8 @@ export const createAndDepositParams = [
           { name: 'deadline', type: 'uint256' },
         ],
       },
+      { name: 'witness', type: 'bytes32' },
+      { name: 'witnessTypeString', type: 'string' },
       { name: 'signature', type: 'bytes' },
     ],
   },
@@ -137,12 +139,16 @@ export const createAndDepositParams = [
  * - ownerStr: Agoric address (e.g., "agoric1...")
  * - tokenOwner: EVM address of the token owner (EOA)
  * - permit: Permit2 PermitTransferFrom data
+ * - witness: EIP-712 hash of witness data
+ * - witnessTypeString: Permit2 witness type string
  * - signature: EIP-2098 compact signature (64 bytes)
  */
 export const buildCreateAndDepositPayload = ({
   ownerStr,
   tokenOwner,
   permit,
+  witness,
+  witnessTypeString,
   signature,
 }: {
   ownerStr: string;
@@ -152,10 +158,12 @@ export const buildCreateAndDepositPayload = ({
     nonce: bigint;
     deadline: bigint;
   };
+  witness: `0x${string}`;
+  witnessTypeString: string;
   signature: `0x${string}`;
 }): `0x${string}` => {
   const abiEncodedData = encodeAbiParameters(createAndDepositParams, [
-    { ownerStr, tokenOwner, permit, signature },
+    { ownerStr, tokenOwner, permit, witness, witnessTypeString, signature },
   ]);
 
   return abiEncodedData;
@@ -262,6 +270,8 @@ export const invokeFactoryDirect = async (
       nonce: BigInt(signedData.permit.nonce as string),
       deadline: BigInt(signedData.permit.deadline as string),
     },
+    witness: signedData.witness,
+    witnessTypeString: signedData.witnessTypeString,
     signature: signature2098,
   });
 

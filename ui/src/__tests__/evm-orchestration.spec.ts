@@ -9,7 +9,7 @@ import {
   createAndDepositParams,
 } from '../evm-orchestration';
 import { decodeAbiParameters } from 'viem';
-import { SEPOLIA_CONTRACTS } from '../open-portfolio-eip712';
+import { WITNESS_TYPE_STRING } from '../open-portfolio-eip712';
 
 test('toEip2098 converts 65-byte signature to 64-byte compact', ({
   expect,
@@ -76,6 +76,8 @@ test('buildCreateAndDepositPayload encodes correctly', ({ expect }) => {
       nonce: 1234567890n,
       deadline: 9999999999n,
     },
+    witness: ('0x' + '00'.repeat(32)) as `0x${string}`,
+    witnessTypeString: WITNESS_TYPE_STRING,
     signature: ('0x' + '00'.repeat(64)) as `0x${string}`,
   });
 
@@ -103,6 +105,8 @@ test('buildCreateAndDepositPayload includes all fields', ({ expect }) => {
       nonce: 1111111111n,
       deadline: 8888888888n,
     },
+    witness: ('0x' + '11'.repeat(32)) as `0x${string}`,
+    witnessTypeString: WITNESS_TYPE_STRING,
     signature: ('0x' + '11'.repeat(64)) as `0x${string}`,
   });
 
@@ -119,47 +123,32 @@ test('buildCreateAndDepositPayload includes all fields', ({ expect }) => {
   expect(payloadLower).toContain('4c4b40');
 });
 
-test('decode viaAxelar tx', ({ expect }) => {
-  // see https://sepolia.etherscan.io/tx/0xf79bc6d31c5403d918fcba9431498aee97e7e76b134c91ff2d054a2137add718
-  const payload =
-    '0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000008cb4b25e77844fc0632aca14f1f9b23bdd654ebf0000000000000000000000001c7d4b196cb0c7b01d743fbc6116a902379c723800000000000000000000000000000000000000000000000000000000000f42400000000000000000000000000000000000000000000000000000019b36e47c210000000000000000000000000000000000000000000000000000000069455ada0000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000002d61676f726963317277776c65793535306b396d6d6b367571366d6d367a3475647267386b7975797666737a6a6b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000416877deb265f786e68290acb428d333f92fc350786b07bfcc49239e856de5d23f1d84c6e9d05c7862e1484dfc1ba772b4f0ad49121a43d9efa3b6ca8d3c0b35541c00000000000000000000000000000000000000000000000000000000000000';
-  const decoded = decodeAbiParameters(createAndDepositParams, payload);
-  expect(decoded.length).toBe(1);
-  expect(decoded[0]).toStrictEqual({
-    ownerStr: 'agoric1rwwley550k9mmk6uq6mm6z4udrg8kyuyvfszjk',
-    tokenOwner: '0x8Cb4b25E77844fC0632aCa14f1f9B23bdd654EbF',
+test('encode and decode payload with witness', ({ expect }) => {
+  // see https://sepolia.etherscan.io/tx/0x094db36eaaa9b790b1f1a95e31d03009522ccc3d7221a4b2df672f4f5efd022d
+  const testData = {
+    ownerStr: 'agoric1y3e3mlnrkuh6j2qcnlrtap42j8mzw240vwr78j',
+    tokenOwner: '0x8Cb4b25E77844fC0632aCa14f1f9B23bdd654EbF' as `0x${string}`,
     permit: {
-      deadline: 1766152922n,
-      nonce: 1766152502305n,
       permitted: {
-        amount: 1000000n,
-        token: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+        token: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
+        amount: 100000n,
       },
+      nonce: 1766597619n,
+      deadline: 1766601219n,
     },
-    signature:
-      '0x6877deb265f786e68290acb428d333f92fc350786b07bfcc49239e856de5d23f1d84c6e9d05c7862e1484dfc1ba772b4f0ad49121a43d9efa3b6ca8d3c0b35541c',
-  });
+    witness:
+      '0xd443041db7847869b49b13ecc501a79cae10a56e8e2370af011c918ac9802541' as `0x${string}`,
+    witnessTypeString: WITNESS_TYPE_STRING,
+    signature: ('0x' + 'ab'.repeat(64)) as `0x${string}`,
+  };
 
-  // XXX should check sig
-});
+  // Encode
+  const payload = buildCreateAndDepositPayload(testData);
 
-test('decode testExecute tx', ({ expect }) => {
-  const payload =
-    '0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000008cb4b25e77844fc0632aca14f1f9b23bdd654ebf0000000000000000000000001c7d4b196cb0c7b01d743fbc6116a902379c723800000000000000000000000000000000000000000000000000000000000f42400000000000000000000000000000000000000000000000000000019b36f68cd70000000000000000000000000000000000000000000000000000000069455e4e0000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000001461676f72696331313736363135333730333031380000000000000000000000000000000000000000000000000000000000000000000000000000000000000041a6320b3b5fa95ab1a3e5944f0482b458afd067364484c8f0d312307b3ad21df97f0ac321665393c482454aebb6138ea4c961347d01bff69eae8f09b1612a03311b00000000000000000000000000000000000000000000000000000000000000';
+  // Decode
   const decoded = decodeAbiParameters(createAndDepositParams, payload);
+
+  // Verify all fields match exactly
   expect(decoded.length).toBe(1);
-  expect(decoded[0]).toStrictEqual({
-    ownerStr: 'agoric11766153703018',
-    tokenOwner: '0x8Cb4b25E77844fC0632aCa14f1f9B23bdd654EbF',
-    permit: {
-      deadline: 1766153806n,
-      nonce: 1766153686231n,
-      permitted: {
-        amount: 1000000n,
-        token: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-      },
-    },
-    signature:
-      '0xa6320b3b5fa95ab1a3e5944f0482b458afd067364484c8f0d312307b3ad21df97f0ac321665393c482454aebb6138ea4c961347d01bff69eae8f09b1612a03311b',
-  });
+  expect(decoded[0]).toStrictEqual(testData);
 });
