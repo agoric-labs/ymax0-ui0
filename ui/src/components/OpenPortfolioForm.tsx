@@ -196,7 +196,7 @@ export function OpenPortfolioForm({
         account: userAddress as `0x${string}`,
         domain: permit2Domain as TypedDataDomain,
         types: permit2Types as Permit2TypesToViem,
-        primaryType: 'PermitTransferFrom',
+        primaryType: 'PermitWitnessTransferFrom',
         message: permit2Values as unknown as Record<string, unknown>,
       });
 
