@@ -23,6 +23,7 @@ import type {
 import { sepolia } from 'viem/chains';
 import type {
   SignedOpenPortfolio,
+  SignedPermit,
   TargetAllocation,
 } from '../evm-portfolio-types';
 import {
@@ -31,6 +32,7 @@ import {
   SEPOLIA_CONTRACTS,
   validateAllocations,
   WITNESS_TYPE,
+  WITNESS_TYPE_STRING,
 } from '../open-portfolio-eip712';
 
 // Constants
@@ -41,7 +43,7 @@ type Permit2TypesToViem = Record<string, Array<{ name: string; type: string }>>;
 interface Props {
   userAddress: `0x${string}`;
   walletClient: WalletClient<Transport, Chain, Account>;
-  onSigned: (result: SignedOpenPortfolio) => void;
+  onSigned: (result: SignedPermit) => void;
 }
 
 const POOL_OPTIONS = [
@@ -157,19 +159,6 @@ export function OpenPortfolioForm({
         deadline,
       };
 
-      // 1. version
-      // 2. nonce (also offerId)
-      // 3. operation / method
-      // 4. operation-specific: targetAlocation
-
-      const toSign = makeOpenPortfolioSignedData(
-        userAddress,
-        amountInSmallestUnit,
-        allocations,
-        { nonce, deadline },
-      );
-
-      // TODO: work out types
       const witnessData = {
         nonce,
         allocations,
@@ -216,21 +205,25 @@ export function OpenPortfolioForm({
 
       // Combine results
       const result: SignedOpenPortfolio = {
-        permitSignature,
-        permit: {
-          permitted: [
-            {
+        signedPermit: {
+          // @ts-expect-error ethers vs. viem
+          chainId: permit2Domain.chainId,
+          permitSignature,
+          permit: {
+            permitted: {
               token: permit.permitted.token,
               amount: permit.permitted.amount.toString(),
             },
-          ],
-          spender: permit.spender,
-          nonce: permit.nonce.toString(),
-          deadline: permit.deadline.toString(),
+            spender: permit.spender,
+            nonce: permit.nonce.toString(),
+            deadline: permit.deadline.toString(),
+          },
+          // @ts-expect-error ethers vs. viem
+          witness,
+          witnessTypeString: WITNESS_TYPE_STRING,
         },
-        intent: toSign.message,
-        witness,
-        // witnessTypeString: WITNESS_TYPE_STRING,
+        owner: 'agoric1LCAallocatedByContract' as const,
+        allocations: witnessData.allocations,
       };
 
       setCurrentStep('');
