@@ -5,45 +5,36 @@
  * 2. OpenPortfolio intent with target allocations
  */
 
-import {
-  PermitTransferFromData,
-  SignatureTransfer,
-  type PermitTransferFrom as Permit2Transfer,
-} from '@uniswap/permit2-sdk';
-import { TypedDataToPrimitiveTypes } from 'abitype';
-import { TypedDataEncoder } from 'ethers';
 import { useState } from 'react';
 import type {
   Account,
   Chain,
   Transport,
-  TypedDataDomain,
   WalletClient,
 } from 'viem';
+import {hashStruct} from 'viem/utils';
+
 import { sepolia } from 'viem/chains';
+import { encodeType } from '../evm/viem.ts';
 import type {
   SignedOpenPortfolio,
-  SignedPermit,
   TargetAllocation,
 } from '../evm-portfolio-types';
 import {
-  makeOpenPortfolioSignedData,
+  createOpenPortfolioMessage,
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
   validateAllocations,
-  WITNESS_TYPE,
-  WITNESS_TYPE_STRING,
 } from '../open-portfolio-eip712';
+import { extractWitnessFieldFromTypes, makeWitnessTypeStringExtractor } from '../evm/permit2/signatureTransfer';
 
 // Constants
 const ONE_HOUR_IN_SECONDS = 3600n;
 
-type Permit2TypesToViem = Record<string, Array<{ name: string; type: string }>>;
-
 interface Props {
   userAddress: `0x${string}`;
   walletClient: WalletClient<Transport, Chain, Account>;
-  onSigned: (result: SignedPermit) => void;
+  onSigned: (result: SignedOpenPortfolio) => void;
 }
 
 const POOL_OPTIONS = [
@@ -57,6 +48,8 @@ const POOL_OPTIONS = [
   'Compound_Optimism',
   'Compound_Base',
 ];
+
+const witnessTypeStringExtractor = makeWitnessTypeStringExtractor({encodeType});
 
 export function OpenPortfolioForm({
   userAddress,
@@ -142,88 +135,48 @@ export function OpenPortfolioForm({
         return;
       }
 
-      // Step 1: Sign Permit2 PermitTransferFrom
-      setCurrentStep('Signing Permit2 (1/2)...');
+      // Sign Permit2 PermitBatchWitnessTransferFrom
+      setCurrentStep('Signing Permit2...');
 
       const deadline =
         BigInt(Math.floor(Date.now() / 1000)) + ONE_HOUR_IN_SECONDS;
       const nonce = BigInt(`${timeStamp}`.replace(/[^0-9]/g, ''));
 
-      const permit: Permit2Transfer = {
-        permitted: {
-          token: SEPOLIA_CONTRACTS.USDC,
-          amount: amountInSmallestUnit,
-        },
-        spender: SEPOLIA_CONTRACTS.FACTORY,
-        nonce,
-        deadline,
-      };
+      const data = createOpenPortfolioMessage(amountInSmallestUnit, allocations, {nonce, deadline, chainId: currentChainId})
 
-      const witnessData = {
-        nonce,
-        allocations,
-        operation: 'createYmaxPortfolio',
-      };
-
-      const {
-        domain: permit2Domain,
-        types: permit2Types,
-        values: permit2Values,
-      } = SignatureTransfer.getPermitData(
-        permit,
-        SEPOLIA_CONTRACTS.PERMIT2,
-        currentChainId,
-        {
-          witness: witnessData,
-          witnessTypeName: 'CreateWallet',
-          witnessType: WITNESS_TYPE,
-        },
-      ) as PermitTransferFromData;
-
-      // Hash witness for contract payload
-      const witness = TypedDataEncoder.hashStruct(
-        'CreateWallet',
-        WITNESS_TYPE,
-        witnessData,
-      ) as `0x${string}`;
-
-      console.log('Permit2 signature request:', {
-        domain: permit2Domain,
-        types: permit2Types,
-        values: permit2Values,
-      });
+      console.log('Permit2 signature request:', data);
 
       const permitSignature = await walletClient.signTypedData({
-        account: userAddress as `0x${string}`,
-        domain: permit2Domain as TypedDataDomain,
-        types: permit2Types as Permit2TypesToViem,
-        primaryType: 'PermitWitnessTransferFrom',
-        message: permit2Values as unknown as Record<string, unknown>,
+        account: userAddress,
+        ...data,
       });
 
       console.log('Permit2 signature received:', permitSignature);
 
+      // Processing of the message that happens on chain & in the EVM service
+      const witnessField = extractWitnessFieldFromTypes(data.types);
+      const { [witnessField.name]: witnessData, ...permit} = data.message;
+      const witness = hashStruct({primaryType: witnessField.type, types: data.types, 
+        data: witnessData,
+      });
+      const witnessTypeString = witnessTypeStringExtractor(data.types);
+
       // Combine results
       const result: SignedOpenPortfolio = {
         signedPermit: {
-          // @ts-expect-error ethers vs. viem
-          chainId: permit2Domain.chainId,
+          chainId: data.domain!.chainId,
           permitSignature,
-          permit: {
-            permitted: {
-              token: permit.permitted.token,
-              amount: permit.permitted.amount.toString(),
-            },
-            spender: permit.spender,
-            nonce: permit.nonce.toString(),
-            deadline: permit.deadline.toString(),
-          },
-          // @ts-expect-error ethers vs. viem
+          permit,
           witness,
-          witnessTypeString: WITNESS_TYPE_STRING,
+          witnessTypeString,
         },
         owner: 'agoric1LCAallocatedByContract' as const,
         allocations: witnessData.allocations,
+        deposit: {
+          amount: permit.permitted.amount,
+          token: permit.permitted.token,
+          chainId: data.domain!.chainId,
+        }
       };
 
       setCurrentStep('');

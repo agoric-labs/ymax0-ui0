@@ -2,15 +2,12 @@
  * EIP-712 utilities for OpenPortfolio intent and Permit2 signatures
  */
 
-import { TypedDataParameter } from 'viem';
-import { SignTypedDataParameters } from 'viem/actions';
-import type {
-  EIP712Domain,
-  OpenPortfolioIntent,
-  TargetAllocation,
-  TokenAmount,
-} from './evm-portfolio-types';
-import { sepolia } from 'viem/chains';
+import { Address } from 'viem';
+import {
+  getPermitWitnessTransferFromData,
+  type TokenPermissions,
+} from './evm/permit2/signatureTransfer.ts';
+import { type TargetAllocation, getYmaxWitness } from './evm/ymax-eip712.ts';
 
 /**
  * Contract addresses for Sepolia testnet
@@ -30,90 +27,49 @@ export const SEPOLIA_CONTRACTS = {
 export const ONE_HOUR_IN_SECONDS = 3600n;
 
 /**
- * Get EIP-712 domain for OpenPortfolio intent
- */
-export const getOpenPortfolioDomain = (chainId: number): EIP712Domain => ({
-  name: 'YMax Portfolio Authorization',
-  version: '1',
-  chainId,
-});
-
-/**
- * Get EIP-712 types for OpenPortfolio intent
- */
-export const OpenPortfolioTypes = {
-  OpenPortfolio: [
-    { name: 'deposit', type: 'TokenAmount' },
-    { name: 'allocations', type: 'Allocation[]' },
-    { name: 'nonce', type: 'uint256' },
-    { name: 'deadline', type: 'uint256' },
-  ],
-  TokenAmount: [
-    { name: 'token', type: 'address' },
-    { name: 'amount', type: 'uint256' },
-  ],
-  Allocation: [
-    { name: 'instrument', type: 'string' },
-    { name: 'portion', type: 'uint256' },
-  ],
-} as const satisfies Record<string, readonly TypedDataParameter[]>;
-
-/**
  * Create OpenPortfolio intent message for EIP-712 signing
  *
- * Note: depositorAddress parameter is kept for validation but not included in the message.
- * The depositor can be recovered from the signature using ecRecover.
+ * Note: The depositor can be recovered from the signature using ecRecover.
  *
  * @param depositAmount - Amount to deposit in smallest unit (e.g., 1000000 for 1 USDC)
  * @param allocations - Target allocations with portions
  * @param options - Optional nonce and deadline (defaults provided)
  * @returns EIP-712 message ready for signing
  */
-export const createOpenPortfolioIntent = (
+export const createOpenPortfolioMessage = (
   depositAmount: bigint,
   allocations: TargetAllocation[],
   options: {
     nonce?: bigint;
     deadline?: bigint;
-    tokenAddress?: `0x${string}`;
+    tokenAddress?: Address;
+    factoryAddress?: Address;
+    permit2Address?: Address;
+    chainId?: bigint | number;
   } = {},
-): OpenPortfolioIntent => {
+) => {
   const {
     nonce = BigInt(Math.floor(Date.now() / 1000)), // XXX ambient Date.now()
     deadline = nonce + ONE_HOUR_IN_SECONDS,
     tokenAddress = SEPOLIA_CONTRACTS.USDC,
+    factoryAddress = SEPOLIA_CONTRACTS.FACTORY,
+    permit2Address = SEPOLIA_CONTRACTS.PERMIT2,
+    chainId = SEPOLIA_CONTRACTS.CHAIN_ID,
   } = options;
 
-  const deposit: TokenAmount = { token: tokenAddress, amount: depositAmount };
-
-  return { deposit, allocations, nonce, deadline };
-};
-
-export const makeOpenPortfolioSignedData = (
-  account: `0x${string}`,
-  depositAmount: bigint,
-  allocations: TargetAllocation[],
-  options: {
-    nonce?: bigint;
-    deadline?: bigint;
-    tokenAddress?: `0x${string}`;
-    chainId?: number;
-  } = {},
-): SignTypedDataParameters<typeof OpenPortfolioTypes, 'OpenPortfolio'> => {
-  const { tokenAddress = SEPOLIA_CONTRACTS.USDC, chainId = sepolia.id } =
-    options;
-  const domain = getOpenPortfolioDomain(chainId);
-  const message = createOpenPortfolioIntent(depositAmount, allocations, {
-    ...options,
-    tokenAddress,
-  });
-  return {
-    account,
-    domain,
-    types: OpenPortfolioTypes,
-    primaryType: 'OpenPortfolio',
-    message,
+  const deposit: TokenPermissions = {
+    token: tokenAddress,
+    amount: depositAmount,
   };
+
+  const witness = getYmaxWitness('OpenPortfolio', { allocations });
+
+  return getPermitWitnessTransferFromData(
+    { permitted: deposit, spender: factoryAddress, nonce, deadline },
+    permit2Address,
+    chainId,
+    witness,
+  );
 };
 
 /**
@@ -192,36 +148,3 @@ export const validateAllocations = (allocations: TargetAllocation[]): void => {
     throw new Error('Duplicate instruments in allocations');
   }
 };
-
-/**
- * Witness utilities for Permit2 signatures
- *
- * TODO: Witness parameters are preliminary and may need adjustments
- * based on final contract requirements. See createAndDeposit.ts for reference.
- */
-
-/**
- * Witness type definition for EIP-712
- * This defines the structure of the witness data
- */
-export const WITNESS_TYPE = {
-  CreateWallet: [
-    { name: 'allocations', type: 'Allocation[]' },
-    { name: 'nonce', type: 'uint256' },
-    // note: chainId is in permit2 domain; factory address is spender in message
-
-    // UX / legibility ideas, to confirm with product
-    { name: 'operation', type: 'string' },
-  ],
-  Allocation: [
-    { name: 'instrument', type: 'string' },
-    { name: 'portion', type: 'uint256' },
-  ],
-};
-
-/**
- * Witness type string for Permit2
- * Format: "[WitnessType] witness)[WitnessTypeDefinition]TokenPermissions(address token,uint256 amount)"
- */
-export const WITNESS_TYPE_STRING =
-  'CreateWallet witness)CreateWallet(string owner,uint256 chainId,address factory)TokenPermissions(address token,uint256 amount)' as const;
