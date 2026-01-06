@@ -1,3 +1,13 @@
+/**
+ * @file YMax operations are either in a permit2 witness or standalone,
+ in either case, following EIP 712
+
+ The fields included in the operation differ based on which way they're submitted.
+ In the wrapped case, we don't want to repeat stuff from the permit envelope.
+
+{@link OperationTypes}
+
+ */
 import type {
   TypedData,
   TypedDataDomain,
@@ -36,8 +46,10 @@ const PortfolioIdParam = {
 // TODO: Remove
 const SharedYmaxTypeParams = [] as const satisfies TypedDataParameter[];
 
-// Fields included in Permit data that we don't want duplicated in witness data,
-// so only included in standalone typed data.
+/**
+ * Fields included in Permit data that we don't want duplicated in witness data,
+ * so only included in standalone typed data.
+ */
 const YmaxStandaloneTypeParams = [
   { name: 'nonce', type: 'uint256' },
   { name: 'deadline', type: 'uint256' },
@@ -74,6 +86,10 @@ export type TargetAllocation = TypedDataToPrimitiveTypes<
   typeof OperationSubTypes
 >['Allocation'];
 
+/**
+ * In the wrapped case, the domain is fixed by permit2, so we can't choose name/version there.
+ * so we put the ymax-specifc domain name and version in the type name.
+ */
 const getYmaxWitnessTypeName = <T extends OperationTypeNames>(operation: T) =>
   `${YMAX_DOMAIN_NAME}V${YMAX_DOMAIN_VERSION}${operation}` as const;
 type YmaxWitnessTypeName<T extends OperationTypeNames> = ReturnType<
@@ -85,6 +101,10 @@ type YmaxWitnessFieldName<T extends OperationTypeNames> = ReturnType<
   typeof getYmaxWitnessFieldName<T>
 >;
 
+/**
+ * showing a field named "witness" in the wallet signing UI is... boring
+ * so let's put something more relevant like the @{link OperationTypes}: Deposit etc.
+ */
 const getYmaxWitnessTypeParam = <T extends OperationTypeNames>(
   operation: T,
 ): YmaxWitnessTypeParam<T> => ({
