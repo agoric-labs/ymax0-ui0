@@ -10,21 +10,26 @@ import type { TypedDataParameter } from '../abitype.ts';
 const PERMIT2_DOMAIN_NAME = 'Permit2';
 
 // TODO: disallow witness type field being another Permit field name
-export interface Witness<
+interface WitnessDefinition<
   T extends TypedData = TypedData,
-  TD extends TypedDataParameter<string, keyof T> = TypedDataParameter<
-    'witness',
-    keyof T
-  >,
+  TD extends TypedDataParameter<string, Extract<keyof T, string>> =
+    TypedDataParameter<'witness', Extract<keyof T, string>>,
 > {
-  witness: TypedDataToPrimitiveTypes<T>[TD['type']];
   witnessField: TD;
   witnessTypes: T;
 }
 
+export interface Witness<
+  T extends TypedData = TypedData,
+  TD extends TypedDataParameter<string, Extract<keyof T, string>> =
+    TypedDataParameter<'witness', Extract<keyof T, string>>,
+> extends WitnessDefinition<T, TD> {
+  witness: TypedDataToPrimitiveTypes<T>[TD['type']];
+}
+
 export function makeWitness<
   T extends TypedData,
-  TD extends TypedDataParameter<string, keyof T>,
+  TD extends TypedDataParameter<string, Extract<keyof T, string>>,
 >(
   data: NoInfer<TypedDataToPrimitiveTypes<T>[TD['type']]>,
   types: T,
@@ -95,11 +100,9 @@ export const PermitBatchTransferFromTypes = {
 
 export function permitWitnessTransferFromTypes<
   T extends TypedData,
-  TD extends TypedDataParameter<string, keyof T> = TypedDataParameter<
-    'witness',
-    keyof T
-  >,
->(witness: Pick<Witness<T, TD>, 'witnessField' | 'witnessTypes'>) {
+  TD extends TypedDataParameter<string, Extract<keyof T, string>> =
+    TypedDataParameter<'witness', Extract<keyof T, string>>,
+>(witness: WitnessDefinition<T, TD>) {
   return {
     EIP712Domain: Permit2DomainTypeParams,
     PermitWitnessTransferFrom: [
@@ -114,11 +117,9 @@ export function permitWitnessTransferFromTypes<
 
 export function permitBatchWitnessTransferFromTypes<
   T extends TypedData,
-  TD extends TypedDataParameter<string, keyof T> = TypedDataParameter<
-    'witness',
-    keyof T
-  >,
->(witness: Pick<Witness<T, TD>, 'witnessField' | 'witnessTypes'>) {
+  TD extends TypedDataParameter<string, Extract<keyof T, string>> =
+    TypedDataParameter<'witness', Extract<keyof T, string>>,
+>(witness: WitnessDefinition<T, TD>) {
   return {
     EIP712Domain: Permit2DomainTypeParams,
     PermitBatchWitnessTransferFrom: [
@@ -156,10 +157,8 @@ export function permit2Domain(
 // and remove duplication between the two functions below
 export function getPermitWitnessTransferFromData<
   T extends TypedData,
-  TD extends TypedDataParameter<string, keyof T> = TypedDataParameter<
-    'witness',
-    keyof T
-  >,
+  TD extends TypedDataParameter<string, Extract<keyof T, string>> =
+    TypedDataParameter<'witness', Extract<keyof T, string>>,
 >(
   permit: PermitTransferFrom,
   permit2Address: Address,
@@ -193,10 +192,8 @@ export function getPermitWitnessTransferFromData<
 
 export function getPermitBatchWitnessTransferFromData<
   T extends TypedData,
-  TD extends TypedDataParameter<string, keyof T> = TypedDataParameter<
-    'witness',
-    keyof T
-  >,
+  TD extends TypedDataParameter<string, Extract<keyof T, string>> =
+    TypedDataParameter<'witness', Extract<keyof T, string>>,
 >(
   permit: PermitBatchTransferFrom,
   permit2Address: Address,
@@ -246,7 +243,8 @@ export const makeWitnessTypeStringExtractor = ({
     }).map(([typeName, typeFunc]) => {
       const encoded = encodeType({
         primaryType: typeName,
-        types: typeFunc(undefined as any),
+        // @ts-expect-error undefined is not allowed in types but supported in implementation
+        types: typeFunc(undefined),
       });
 
       const prefix = encoded.substring(0, encoded.indexOf(')'));
@@ -283,6 +281,7 @@ export const makeWitnessTypeStringExtractor = ({
 };
 
 type MapUnion<U> = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [K in U extends any ? keyof U : never]: U extends any
     ? K extends keyof U
       ? U[K]

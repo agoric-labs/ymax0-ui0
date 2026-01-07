@@ -37,7 +37,7 @@ function findTypeDependencies(
   results: Set<string> = new Set(),
 ): Set<string> {
   const match = primaryType_.match(/^\w*/u);
-  const primaryType = match?.[0]!;
+  const primaryType = match?.[0] as string;
   if (results.has(primaryType) || types[primaryType] === undefined) {
     return results;
   }
