@@ -8,13 +8,12 @@ import {
   Chain,
   encodeAbiParameters,
   Transport,
-  type Address,
   type PublicClient,
   type WalletClient,
 } from 'viem';
 
 import { getContract } from 'viem';
-import type { SignedOpenPortfolio } from './evm-portfolio-types';
+import type { CreateAndDepositPayload } from './evm-portfolio-types';
 import { SEPOLIA_CONTRACTS } from './open-portfolio-eip712';
 
 /**
@@ -106,7 +105,7 @@ export const createAndDepositParams = [
     type: 'tuple',
     name: 'p',
     components: [
-      { name: 'ownerStr', type: 'string' },
+      { name: 'lcaOwner', type: 'string' },
       { name: 'tokenOwner', type: 'address' },
       {
         name: 'permit',
@@ -114,7 +113,7 @@ export const createAndDepositParams = [
         components: [
           {
             name: 'permitted',
-            type: 'tuple[]', // Array of tokens for PermitBatchTransferFrom
+            type: 'tuple', // single TokenPermissions
             components: [
               { name: 'token', type: 'address' },
               { name: 'amount', type: 'uint256' },
@@ -136,7 +135,7 @@ export const createAndDepositParams = [
  *
  * This encodes the permit and signature into the format expected by Factory.sol
  * The payload includes:
- * - ownerStr: Agoric address (e.g., "agoric1...")
+ * - lcaOwner: Agoric address (e.g., "agoric1...")
  * - tokenOwner: EVM address of the token owner (EOA)
  * - permit: Permit2 PermitBatchTransferFrom data (array of permitted tokens)
  * - witness: EIP-712 hash of witness data
@@ -144,26 +143,15 @@ export const createAndDepositParams = [
  * - signature: EIP-2098 compact signature (64 bytes)
  */
 export const buildCreateAndDepositPayload = ({
-  ownerStr,
+  lcaOwner,
   tokenOwner,
   permit,
   witness,
   witnessTypeString,
   signature,
-}: {
-  ownerStr: string;
-  tokenOwner: Address;
-  permit: {
-    permitted: Array<{ token: Address; amount: bigint }>;
-    nonce: bigint;
-    deadline: bigint;
-  };
-  witness: `0x${string}`;
-  witnessTypeString: string;
-  signature: `0x${string}`;
-}): `0x${string}` => {
+}: CreateAndDepositPayload): `0x${string}` => {
   const abiEncodedData = encodeAbiParameters(createAndDepositParams, [
-    { ownerStr, tokenOwner, permit, witness, witnessTypeString, signature },
+    { lcaOwner, tokenOwner, permit, witness, witnessTypeString, signature },
   ]);
 
   return abiEncodedData;
@@ -235,47 +223,43 @@ export const ensurePermit2Allowance = async (
  */
 export const invokeFactoryDirect = async (
   walletClient: WalletClient<Transport, Chain, Account>,
-  signedData: SignedOpenPortfolio,
+  signedPermit: Omit<CreateAndDepositPayload, 'lcaOwner'>,
   onProgress?: (message: string) => void,
 ): Promise<{ hash: `0x${string}` }> => {
   const address = walletClient.account?.address;
   if (!address) throw new Error('No wallet address available');
 
+  if (address !== signedPermit.tokenOwner) {
+    throw new Error(
+      `Wallet address (${address}) does not match tokenOwner in permit (${signedPermit.tokenOwner})`,
+    );
+  }
+
   onProgress?.('Converting signature to EIP-2098 format...');
 
   // Convert 65-byte signature to 64-byte compact format
-  const signature2098 = toEip2098(signedData.permitSignature as `0x${string}`);
+  const signature2098 = toEip2098(signedPermit.signature);
 
   onProgress?.(
-    `Signature: ${signature2098.length - 2} bytes (EIP-2098 compact)`,
+    `Signature: ${(signature2098.length - 2) / 2} bytes (EIP-2098 compact)`,
   );
 
-  // Generate unique ownerStr (Agoric address) for create2
+  // Generate unique lcaOwner (Agoric address) for create2
   // In production, this would be the actual Agoric address
-  const ownerStr = `agoric1${Date.now()}`;
+  const lcaOwner = `agoric1${Date.now()}` as const;
 
-  onProgress?.(`Agoric address (ownerStr): ${ownerStr}`);
+  onProgress?.(`Agoric address (lcaOwner): ${lcaOwner}`);
 
   // Build the payload
   onProgress?.('Building CreateAndDepositPayload...');
 
   const payload = buildCreateAndDepositPayload({
-    ownerStr,
-    tokenOwner: address,
-    permit: {
-      permitted: signedData.permit.permitted.map(p => ({
-        token: p.token as Address,
-        amount: BigInt(p.amount as string),
-      })),
-      nonce: BigInt(signedData.permit.nonce as string),
-      deadline: BigInt(signedData.permit.deadline as string),
-    },
-    witness: signedData.witness,
-    witnessTypeString: signedData.witnessTypeString,
+    ...signedPermit,
+    lcaOwner,
     signature: signature2098,
   });
 
-  onProgress?.(`Payload encoded: ${payload.length - 2} bytes`);
+  onProgress?.(`Payload encoded: ${(payload.length - 2) / 2} bytes`);
 
   // Get the Factory contract
   const factory = getContract({

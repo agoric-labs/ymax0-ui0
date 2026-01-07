@@ -6,27 +6,18 @@
  */
 
 import { useState } from 'react';
-import type {
-  Account,
-  Chain,
-  Transport,
-  WalletClient,
-} from 'viem';
-import {hashStruct} from 'viem/utils';
+import type { Account, Chain, Transport, WalletClient } from 'viem';
 
 import { sepolia } from 'viem/chains';
-import { encodeType } from '../evm/viem.ts';
-import type {
-  SignedOpenPortfolio,
-  TargetAllocation,
-} from '../evm-portfolio-types';
+import { WithSignature } from '../evm/viem.ts';
+import type { SignedMessage, TargetAllocation } from '../evm-portfolio-types';
 import {
   createOpenPortfolioMessage,
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
   validateAllocations,
 } from '../open-portfolio-eip712';
-import { extractWitnessFieldFromTypes, makeWitnessTypeStringExtractor } from '../evm/permit2/signatureTransfer';
+import { YmaxPermitWitnessTransferFromData } from '../evm/ymax-eip712.ts';
 
 // Constants
 const ONE_HOUR_IN_SECONDS = 3600n;
@@ -34,7 +25,7 @@ const ONE_HOUR_IN_SECONDS = 3600n;
 interface Props {
   userAddress: `0x${string}`;
   walletClient: WalletClient<Transport, Chain, Account>;
-  onSigned: (result: SignedOpenPortfolio) => void;
+  onSigned: (result: SignedMessage) => void;
 }
 
 const POOL_OPTIONS = [
@@ -48,8 +39,6 @@ const POOL_OPTIONS = [
   'Compound_Optimism',
   'Compound_Base',
 ];
-
-const witnessTypeStringExtractor = makeWitnessTypeStringExtractor({encodeType});
 
 export function OpenPortfolioForm({
   userAddress,
@@ -142,7 +131,11 @@ export function OpenPortfolioForm({
         BigInt(Math.floor(Date.now() / 1000)) + ONE_HOUR_IN_SECONDS;
       const nonce = BigInt(`${timeStamp}`.replace(/[^0-9]/g, ''));
 
-      const data = createOpenPortfolioMessage(amountInSmallestUnit, allocations, {nonce, deadline, chainId: currentChainId})
+      const data = createOpenPortfolioMessage(
+        amountInSmallestUnit,
+        allocations,
+        { nonce, deadline, chainId: currentChainId },
+      );
 
       console.log('Permit2 signature request:', data);
 
@@ -151,36 +144,16 @@ export function OpenPortfolioForm({
         ...data,
       });
 
+      const signedData = {
+        ...data,
+        signature: permitSignature,
+      } satisfies WithSignature<
+        YmaxPermitWitnessTransferFromData<'OpenPortfolio'>
+      >;
+
       console.log('Permit2 signature received:', permitSignature);
-
-      // Processing of the message that happens on chain & in the EVM service
-      const witnessField = extractWitnessFieldFromTypes(data.types);
-      const { [witnessField.name]: witnessData, ...permit} = data.message;
-      const witness = hashStruct({primaryType: witnessField.type, types: data.types, 
-        data: witnessData,
-      });
-      const witnessTypeString = witnessTypeStringExtractor(data.types);
-
-      // Combine results
-      const result: SignedOpenPortfolio = {
-        signedPermit: {
-          chainId: data.domain!.chainId,
-          permitSignature,
-          permit,
-          witness,
-          witnessTypeString,
-        },
-        owner: 'agoric1LCAallocatedByContract' as const,
-        allocations: witnessData.allocations,
-        deposit: {
-          amount: permit.permitted.amount,
-          token: permit.permitted.token,
-          chainId: data.domain!.chainId,
-        }
-      };
-
       setCurrentStep('');
-      onSigned(result);
+      onSigned(signedData);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Failed to sign messages';

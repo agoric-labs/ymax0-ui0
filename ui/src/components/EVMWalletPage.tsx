@@ -6,10 +6,20 @@
  */
 
 import React, { useState } from 'react';
-import type { Account, Chain, Transport, WalletClient } from 'viem';
+import {
+  isHex,
+  type Account,
+  type Chain,
+  type Transport,
+  type WalletClient,
+} from 'viem';
+import { type CopyRecord, type Passable, makeMarshal } from '@endo/marshal';
 import { EVMWalletConnection } from './EVMWalletConnection';
 import { OpenPortfolioForm } from './OpenPortfolioForm';
-import type { SignedOpenPortfolio } from '../evm-portfolio-types';
+import type {
+  CreateAndDepositPayload,
+  SignedMessage,
+} from '../evm-portfolio-types';
 import {
   invokeFactoryDirect,
   ensurePermit2Allowance,
@@ -17,6 +27,41 @@ import {
 } from '../evm-orchestration';
 import { formatUSDCAmount } from '../open-portfolio-eip712';
 import { useSepoliaPublicClient } from '../utils/sepoliaPublicClient.ts';
+import {
+  YmaxPermitWitnessTransferFromData,
+  YmaxStandaloneOperationData,
+} from '../evm/ymax-eip712.ts';
+import { WithSignature } from '../evm/viem.ts';
+import {
+  extractOperationDetailsFromSignedData,
+  FullMessageDetails,
+} from '../evm-handler.ts';
+
+const marshaller = makeMarshal(undefined, undefined, {
+  serializeBodyFormat: 'smallcaps',
+});
+
+// Workaround for `@agoric/smart-wallet` being too old
+
+type ResultPlan = {
+  /** name by which to save the item */
+  name: string;
+  /** whether to overwrite an existing item (default false) */
+  overwrite?: boolean;
+};
+
+type InvokeEntryMessage = {
+  targetName: string;
+  method: string;
+  args: Passable[];
+  saveResult?: ResultPlan;
+  id?: number | string;
+};
+
+type InvokeStoreEntryAction = {
+  method: 'invokeEntry';
+  message: InvokeEntryMessage;
+};
 
 /**
  * Mock EVM Handler (based on makeEVMHandler pattern from createAndDeposit.ts)
@@ -35,31 +80,143 @@ import { useSepoliaPublicClient } from '../utils/sepoliaPublicClient.ts';
  * In production, the UI would submit to an EVM Message Service (EMS) app server.
  */
 const mockEVMHandler = {
-  async handleOpenPortfolio(signed: SignedOpenPortfolio): Promise<void> {
+  async handleOpenPortfolio(signed: SignedMessage): Promise<void> {
     console.log('=== Mock Console: Production Flow ===');
     console.log('This testing page shows what WOULD happen in production:\n');
     console.log(
       '1. UI submits signed intent to EVM Message Service (EMS) app server',
     );
+    let structure;
+    {
+      structure = marshaller
+        .toCapData(harden(signed) as CopyRecord)
+        .body.slice(1);
+    }
     console.log('2. EMS wraps the intent and submits an Agoric transaction');
+    let spendAction: string;
+    {
+      const receivedData = marshaller.fromCapData({
+        body: `#${structure}`,
+        slots: [],
+      }) as WithSignature<
+        YmaxPermitWitnessTransferFromData | YmaxStandaloneOperationData
+      >;
+      const details: FullMessageDetails =
+        await extractOperationDetailsFromSignedData(receivedData);
+
+      switch (details.operation) {
+        case 'OpenPortfolio':
+        case 'Deposit':
+          if (!details.permit) {
+            throw new Error('Missing permit in OpenPortfolio/Deposit');
+          }
+          break;
+        case 'Rebalance':
+          break;
+        default: {
+          // @ts-expect-error exhaustive check
+          throw new Error(`Unsupported operation: ${details.operation}`);
+        }
+      }
+
+      if (details.permit) {
+        // Not done: validate permit details against chain
+      }
+
+      const invokeAction: InvokeStoreEntryAction = harden({
+        method: 'invokeEntry',
+        message: {
+          targetName: 'evmHandler',
+          method: 'handleMessage',
+          args: [receivedData as CopyRecord],
+        },
+      });
+
+      spendAction = JSON.stringify(marshaller.toCapData(invokeAction));
+    }
     console.log('3. EVM Message Handler (EMH) on Agoric validates signatures');
+    let methargs;
+    {
+      const action = marshaller.fromCapData(
+        JSON.parse(spendAction),
+      ) as InvokeStoreEntryAction;
+
+      const signedMessage = action.message
+        .args[0] as CopyRecord as WithSignature<
+        YmaxPermitWitnessTransferFromData | YmaxStandaloneOperationData
+      >;
+
+      const details: FullMessageDetails =
+        await extractOperationDetailsFromSignedData(signedMessage);
+
+      if (details.deadline < BigInt(Math.floor(Date.now() / 1000))) {
+        throw new Error('Permit has expired');
+      }
+
+      if (details.nonce === BigInt(0)) {
+        // Must validate nonce against stored nonces on chain
+        throw new Error('Invalid nonce in permit');
+      }
+
+      switch (details.operation) {
+        case 'OpenPortfolio': {
+          if (!details.permit) {
+            throw new Error('Missing permit in OpenPortfolio');
+          }
+          const { chainId, signature, ...permitDetails } = details.permit;
+
+          if (!isHex(signature)) {
+            throw new Error('Unsupported signature format');
+          }
+
+          const signedPermit = {
+            ...permitDetails,
+            signature,
+            tokenOwner: details.evmWalletAddress,
+          } satisfies Omit<CreateAndDepositPayload, 'lcaOwner'>;
+
+          const depositDetails = {
+            chainId,
+            ...details.permit.permit.permitted,
+            signedPermit,
+          };
+
+          const targetAllocation: Record<string, bigint> = Object.fromEntries(
+            details.data.allocations.map(a => [a.instrument, a.portion]),
+          );
+
+          methargs = [
+            details.operation,
+            { targetAllocation, deposit: depositDetails },
+          ] as const;
+
+          break;
+        }
+        default:
+          throw new Error(`Unsupported operation: ${details.operation}`);
+      }
+    }
     console.log('4. EMH passes to Ymax contract, which uses Orchestrator');
+    let lcaAddress;
+    {
+      lcaAddress = 'agoric1LCAAllocatedByContract';
+      console.log('Method arguments:', methargs);
+    }
     console.log('5. Orchestrator sends IBC transaction to Axelar');
+    let payload;
+    {
+      payload = {
+        lcaOwner: lcaAddress,
+        ...methargs[1].deposit.signedPermit,
+      };
+      console.log('Payload for Axelar:', payload);
+    }
     console.log(
       '6. Axelar GMP routes to EVM chain (Base in production, Sepolia in testing)',
     );
     console.log(
       '7. Factory contract creates wallet and deposits funds via Permit2\n',
     );
-    console.log('--- Signed Data for Production Flow ---');
-    console.log('Permit Signature:', signed.permitSignature);
-    console.log('Intent Signature:', signed.intentSignature);
-    console.log('\n--- Permit2 Data ---');
-    console.log(JSON.stringify(signed.permit, null, 2));
-    console.log('\n--- OpenPortfolio Intent ---');
-    console.log(JSON.stringify(signed.intent, null, 2));
-    console.log('\n--- Allocations ---');
-    console.log(JSON.stringify(signed.intent.allocations, null, 2));
     console.log('\n=== Direct Style (Issue #22) ===');
     console.log(
       'The "Submit to Sepolia (Direct)" button MOCKS EMS, EMH, Orch, and Axelar',
@@ -75,9 +232,7 @@ export function EVMWalletPage() {
     Chain,
     Account
   > | null>(null);
-  const [signedData, setSignedData] = useState<SignedOpenPortfolio | null>(
-    null,
-  );
+  const [signedData, setSignedData] = useState<SignedMessage | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [txHash, setTxHash] = useState<string>('');
@@ -102,7 +257,7 @@ export function EVMWalletPage() {
     ]);
   };
 
-  const handleSigned = async (result: SignedOpenPortfolio) => {
+  const handleSigned = async (result: SignedMessage) => {
     setSignedData(result);
     setSubmitted(false);
     setTxHash('');
@@ -121,9 +276,24 @@ export function EVMWalletPage() {
     try {
       addProgress('Starting direct Sepolia submission...');
 
+      const details = (await extractOperationDetailsFromSignedData(
+        // @ts-expect-error generic/union type issue
+        signedData,
+      )) as FullMessageDetails;
+
+      if (details.operation !== 'OpenPortfolio') {
+        throw new Error(
+          `Unsupported operation for direct submission: ${details.operation}`,
+        );
+      }
+
+      if (!details.permit) {
+        throw new Error('Missing permit in OpenPortfolio');
+      }
+
       // Step 1: Ensure Permit2 allowance
       addProgress('Checking USDC allowance for Permit2...');
-      const amount = BigInt(signedData.permit.permitted[0].amount as string);
+      const { amount } = details.permit.permit.permitted;
 
       await ensurePermit2Allowance(
         amount,
@@ -133,9 +303,28 @@ export function EVMWalletPage() {
 
       // Step 2: Invoke Factory.testExecute
       addProgress('Invoking Factory.testExecute on Sepolia...');
+
+      const { chainId, signature, ...permitDetails } = details.permit;
+
+      if (chainId !== BigInt(walletClient.chain.id)) {
+        throw new Error(
+          `Permit chainId (${chainId}) does not match wallet chainId (${walletClient.chain.id})`,
+        );
+      }
+
+      if (!isHex(signature)) {
+        throw new Error('Unsupported signature format');
+      }
+
+      const signedPermit = {
+        ...permitDetails,
+        signature,
+        tokenOwner: details.evmWalletAddress,
+      } satisfies Omit<CreateAndDepositPayload, 'lcaOwner'>;
+
       const { hash } = await invokeFactoryDirect(
         walletClient,
-        signedData,
+        signedPermit,
         addProgress,
       );
 
