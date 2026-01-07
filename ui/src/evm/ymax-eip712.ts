@@ -52,7 +52,7 @@ const OperationTypes = {
   Deposit: [PortfolioIdParam],
 } as const satisfies TypedData;
 type OperationTypes = typeof OperationTypes;
-type OperationTypeNames = keyof OperationTypes;
+export type OperationTypeNames = keyof OperationTypes;
 
 const OperationSubTypes = {
   Allocation: [
@@ -91,8 +91,9 @@ const getYmaxWitnessTypeParam = <T extends OperationTypeNames>(
   name: getYmaxWitnessFieldName(operation),
   type: getYmaxWitnessTypeName(operation),
 });
-type YmaxWitnessTypeParam<T extends OperationTypeNames = OperationTypeNames> =
-  TypedDataParameter<YmaxWitnessFieldName<T>, YmaxWitnessTypeName<T>>;
+export type YmaxWitnessTypeParam<
+  T extends OperationTypeNames = OperationTypeNames,
+> = TypedDataParameter<YmaxWitnessFieldName<T>, YmaxWitnessTypeName<T>>;
 
 // TODO: Filter operation types to only those needed for witness/standalone
 type YmaxWitnessOperationTypes<
@@ -119,6 +120,9 @@ type YmaxStandaloneTypes<T extends OperationTypeNames = OperationTypeNames> =
     typeof OperationSubTypes & {
       EIP712Domain: typeof YmaxStandaloneDomainTypeParams;
     };
+
+export type YmaxOperationType<T extends OperationTypeNames> =
+  TypedDataToPrimitiveTypes<OperationTypes & typeof OperationSubTypes>[T];
 
 // Hack to satisfy TypeScript limitations with generic inference in complex types
 // Equivalent to `YmaxWitnessTypeParam`
@@ -147,6 +151,16 @@ const getYmaxStandaloneTypes = <T extends OperationTypeNames>(operation: T) =>
     ],
     ...OperationSubTypes,
   }) as YmaxStandaloneTypes<T> satisfies TypedData;
+
+export const getYmaxOperationTypes = <T extends OperationTypeNames>(
+  operation: T,
+) =>
+  ({
+    [operation]: OperationTypes[operation],
+    ...OperationSubTypes,
+  }) as {
+    [K in T]: OperationTypes[K];
+  } & typeof OperationSubTypes satisfies TypedData;
 
 export const getYmaxWitness = <T extends OperationTypeNames>(
   operation: T,
@@ -200,3 +214,51 @@ export type YmaxPermitBatchWitnessTransferFromData<
     YmaxWitnessMappedTypeParam<T>
   >
 >;
+
+export function validateYmaxDomain(
+  domain: TypedDataDomain,
+): asserts domain is typeof YmaxStandaloneDomain {
+  if (domain.name !== YMAX_DOMAIN_NAME) {
+    throw new Error(
+      `Invalid Ymax domain name: ${domain.name} (expected ${YMAX_DOMAIN_NAME})`,
+    );
+  }
+  if (domain.version !== YMAX_DOMAIN_VERSION) {
+    throw new Error(
+      `Invalid Ymax domain version: ${domain.version} (expected ${YMAX_DOMAIN_VERSION})`,
+    );
+  }
+  // TODO: check no extra fields?
+}
+
+export function validateYmaxOperationTypeName<T extends OperationTypeNames>(
+  typeName: string,
+): asserts typeName is T {
+  if (!(typeName in OperationTypes)) {
+    throw new Error(
+      `Unknown Ymax operation type: ${typeName} (expected one of ${Object.keys(OperationTypes).join(', ')})`,
+    );
+  }
+}
+
+export const splitWitnessFieldType = <T extends OperationTypeNames>(
+  fieldName: `${typeof YMAX_DOMAIN_NAME}V${typeof YMAX_DOMAIN_VERSION}${T}`,
+) => {
+  const match = fieldName.match(/^YmaxV(\d+)(\w+)$/u);
+  if (!match) {
+    throw new Error(`Invalid witness field type name: ${fieldName}`);
+  }
+  const [, version, operation] = match;
+  const domain = {
+    name: YMAX_DOMAIN_NAME,
+    version,
+  } satisfies TypedDataDomain;
+
+  validateYmaxDomain(domain);
+  validateYmaxOperationTypeName<T>(operation);
+
+  return {
+    domain,
+    primaryType: operation,
+  };
+};
