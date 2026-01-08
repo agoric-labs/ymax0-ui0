@@ -60,5 +60,13 @@
     "eslint-plugin-testing-library": "^6.2.0",
     "eslint-plugin-ui-testing": "^2.0.1",
     "serve": "^14.2.1"
+  },
+  "dependenciesMeta": {
+    "better-sqlite3": {
+      "built": false
+    },
+    "microtime": {
+      "built": false
+    }
   }
 }

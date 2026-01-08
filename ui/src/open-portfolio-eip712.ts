@@ -6,8 +6,11 @@ import { Address } from 'viem';
 import {
   getPermitWitnessTransferFromData,
   type TokenPermissions,
-} from './evm/permit2/signatureTransfer.ts';
-import { type TargetAllocation, getYmaxWitness } from './evm/ymax-eip712.ts';
+} from '@agoric/orchestration/src/utils/permit2.ts';
+import {
+  type TargetAllocation,
+  getYmaxWitness,
+} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
 
 /**
  * Contract addresses for Sepolia testnet
