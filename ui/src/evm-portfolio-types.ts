@@ -7,12 +7,12 @@ import type {
   TargetAllocation,
   YmaxPermitWitnessTransferFromData,
   YmaxStandaloneOperationData,
-} from './evm/ymax-eip712.ts';
-import type { PermitTransferFrom } from './evm/permit2/signatureTransfer';
+} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
+import type { PermitTransferFrom } from '@agoric/orchestration/src/utils/permit2.ts';
 import type { Bech32Address } from '@agoric/cosmic-proto/address-hooks.js';
-import type { WithSignature } from './evm/viem.ts';
+import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
 
-export { type TargetAllocation };
+export type { TargetAllocation };
 
 export type SignedMessage =
   | WithSignature<YmaxPermitWitnessTransferFromData<'OpenPortfolio'>>

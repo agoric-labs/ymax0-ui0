@@ -27,14 +27,14 @@ import {
 } from '../evm-orchestration';
 import { formatUSDCAmount } from '../open-portfolio-eip712';
 import { useSepoliaPublicClient } from '../utils/sepoliaPublicClient.ts';
-import {
+import type {
   YmaxPermitWitnessTransferFromData,
   YmaxStandaloneOperationData,
-} from '../evm/ymax-eip712.ts';
-import { WithSignature } from '../evm/viem.ts';
+} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
+import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
 import {
   extractOperationDetailsFromSignedData,
-  FullMessageDetails,
+  type FullMessageDetails,
 } from '../evm-handler.ts';
 
 const marshaller = makeMarshal(undefined, undefined, {

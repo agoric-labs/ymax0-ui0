@@ -9,7 +9,7 @@ import { useState } from 'react';
 import type { Account, Chain, Transport, WalletClient } from 'viem';
 
 import { sepolia } from 'viem/chains';
-import { WithSignature } from '../evm/viem.ts';
+import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
 import type { SignedMessage, TargetAllocation } from '../evm-portfolio-types';
 import {
   createOpenPortfolioMessage,
@@ -17,7 +17,7 @@ import {
   SEPOLIA_CONTRACTS,
   validateAllocations,
 } from '../open-portfolio-eip712';
-import { YmaxPermitWitnessTransferFromData } from '../evm/ymax-eip712.ts';
+import type { YmaxPermitWitnessTransferFromData } from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
 
 // Constants
 const ONE_HOUR_IN_SECONDS = 3600n;
