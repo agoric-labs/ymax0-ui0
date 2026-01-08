@@ -229,7 +229,8 @@ export const invokeFactoryDirect = async (
   const address = walletClient.account?.address;
   if (!address) throw new Error('No wallet address available');
 
-  if (address !== signedPermit.tokenOwner) {
+  // Compare addresses case-insensitively (Ethereum addresses are case-insensitive)
+  if (address.toLowerCase() !== signedPermit.tokenOwner.toLowerCase()) {
     throw new Error(
       `Wallet address (${address}) does not match tokenOwner in permit (${signedPermit.tokenOwner})`,
     );

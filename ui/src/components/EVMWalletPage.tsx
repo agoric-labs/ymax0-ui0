@@ -306,7 +306,8 @@ export function EVMWalletPage() {
 
       const { chainId, signature, ...permitDetails } = details.permit;
 
-      if (chainId !== BigInt(walletClient.chain.id)) {
+      // Compare as BigInt to handle both number and bigint chainId types
+      if (BigInt(chainId) !== BigInt(walletClient.chain.id)) {
         throw new Error(
           `Permit chainId (${chainId}) does not match wallet chainId (${walletClient.chain.id})`,
         );
