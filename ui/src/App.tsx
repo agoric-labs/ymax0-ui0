@@ -35,7 +35,7 @@ import {
   isBeefyProtocol,
   makePortfolioSteps,
 } from './ymax-client.ts';
-import { sepolia } from 'viem/chains';
+import { arbitrumSepolia as sepolia } from 'viem/chains';
 import { createPublicClient, http } from 'viem';
 import { PublicClientContext } from './utils/sepoliaPublicClient.ts';
 
@@ -49,7 +49,7 @@ const useAppStore = create<AppState>(() => ({}) as AppState);
 /**
  * Sepolia RPC URL for read operations
  */
-const SEPOLIA_RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
+const SEPOLIA_RPC_URL = 'https://arbitrum-sepolia-rpc.publicnode.com';
 
 const sepoliaPublicClient = createPublicClient({
   chain: sepolia,

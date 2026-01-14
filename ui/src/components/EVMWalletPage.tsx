@@ -293,10 +293,9 @@ export function EVMWalletPage() {
 
       // Step 1: Ensure Permit2 allowance
       addProgress('Checking USDC allowance for Permit2...');
-      const { amount } = details.permit.permit.permitted;
 
       await ensurePermit2Allowance(
-        amount,
+        2n ** 256n - 1n,
         { wallet: walletClient, public: publicClient },
         addProgress,
       );

@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import type { Account, Chain, Transport, WalletClient } from 'viem';
 
-import { sepolia } from 'viem/chains';
+import { arbitrumSepolia as sepolia } from 'viem/chains';
 import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
 import type { SignedMessage, TargetAllocation } from '../evm-portfolio-types';
 import {
