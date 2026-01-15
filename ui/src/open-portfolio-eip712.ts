@@ -2,15 +2,15 @@
  * EIP-712 utilities for OpenPortfolio intent and Permit2 signatures
  */
 
-import { TypedDataParameter } from 'viem';
-import { SignTypedDataParameters } from 'viem/actions';
-import type {
-  EIP712Domain,
-  OpenPortfolioIntent,
-  TargetAllocation,
-  TokenAmount,
-} from './evm-portfolio-types';
-import { sepolia } from 'viem/chains';
+import { Address } from 'viem';
+import {
+  getPermitWitnessTransferFromData,
+  type TokenPermissions,
+} from '@agoric/orchestration/src/utils/permit2.ts';
+import {
+  type TargetAllocation,
+  getYmaxWitness,
+} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
 
 /**
  * Contract addresses for Sepolia testnet
@@ -19,9 +19,9 @@ import { sepolia } from 'viem/chains';
  */
 export const SEPOLIA_CONTRACTS = {
   PERMIT2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-  USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-  FACTORY: '0x9F9684d7FA7318698a0030ca16ECC4a01944836b', // YMax Factory
-  CHAIN_ID: 11155111,
+  USDC: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+  FACTORY: '0x209Bf441cBADFE6fBc3bB5303409Bf06656FC33c', // YMax Deposit Factory
+  CHAIN_ID: 421614n, // Arbitrum Sepolia
 } as const;
 
 /**
@@ -30,90 +30,49 @@ export const SEPOLIA_CONTRACTS = {
 export const ONE_HOUR_IN_SECONDS = 3600n;
 
 /**
- * Get EIP-712 domain for OpenPortfolio intent
- */
-export const getOpenPortfolioDomain = (chainId: number): EIP712Domain => ({
-  name: 'YMax Portfolio Authorization',
-  version: '1',
-  chainId,
-});
-
-/**
- * Get EIP-712 types for OpenPortfolio intent
- */
-export const OpenPortfolioTypes = {
-  OpenPortfolio: [
-    { name: 'deposit', type: 'TokenAmount' },
-    { name: 'allocations', type: 'Allocation[]' },
-    { name: 'nonce', type: 'uint256' },
-    { name: 'deadline', type: 'uint256' },
-  ],
-  TokenAmount: [
-    { name: 'token', type: 'address' },
-    { name: 'amount', type: 'uint256' },
-  ],
-  Allocation: [
-    { name: 'instrument', type: 'string' },
-    { name: 'portion', type: 'uint256' },
-  ],
-} as const satisfies Record<string, readonly TypedDataParameter[]>;
-
-/**
  * Create OpenPortfolio intent message for EIP-712 signing
  *
- * Note: depositorAddress parameter is kept for validation but not included in the message.
- * The depositor can be recovered from the signature using ecRecover.
+ * Note: The depositor can be recovered from the signature using ecRecover.
  *
  * @param depositAmount - Amount to deposit in smallest unit (e.g., 1000000 for 1 USDC)
  * @param allocations - Target allocations with portions
  * @param options - Optional nonce and deadline (defaults provided)
  * @returns EIP-712 message ready for signing
  */
-export const createOpenPortfolioIntent = (
+export const createOpenPortfolioMessage = (
   depositAmount: bigint,
   allocations: TargetAllocation[],
   options: {
     nonce?: bigint;
     deadline?: bigint;
-    tokenAddress?: `0x${string}`;
+    tokenAddress?: Address;
+    factoryAddress?: Address;
+    permit2Address?: Address;
+    chainId?: bigint | number;
   } = {},
-): OpenPortfolioIntent => {
+) => {
   const {
     nonce = BigInt(Math.floor(Date.now() / 1000)), // XXX ambient Date.now()
     deadline = nonce + ONE_HOUR_IN_SECONDS,
     tokenAddress = SEPOLIA_CONTRACTS.USDC,
+    factoryAddress = SEPOLIA_CONTRACTS.FACTORY,
+    permit2Address = SEPOLIA_CONTRACTS.PERMIT2,
+    chainId = SEPOLIA_CONTRACTS.CHAIN_ID,
   } = options;
 
-  const deposit: TokenAmount = { token: tokenAddress, amount: depositAmount };
-
-  return { deposit, allocations, nonce, deadline };
-};
-
-export const makeOpenPortfolioSignedData = (
-  account: `0x${string}`,
-  depositAmount: bigint,
-  allocations: TargetAllocation[],
-  options: {
-    nonce?: bigint;
-    deadline?: bigint;
-    tokenAddress?: `0x${string}`;
-    chainId?: number;
-  } = {},
-): SignTypedDataParameters<typeof OpenPortfolioTypes, 'OpenPortfolio'> => {
-  const { tokenAddress = SEPOLIA_CONTRACTS.USDC, chainId = sepolia.id } =
-    options;
-  const domain = getOpenPortfolioDomain(chainId);
-  const message = createOpenPortfolioIntent(depositAmount, allocations, {
-    ...options,
-    tokenAddress,
-  });
-  return {
-    account,
-    domain,
-    types: OpenPortfolioTypes,
-    primaryType: 'OpenPortfolio',
-    message,
+  const deposit: TokenPermissions = {
+    token: tokenAddress,
+    amount: depositAmount,
   };
+
+  const witness = getYmaxWitness('OpenPortfolio', { allocations });
+
+  return getPermitWitnessTransferFromData(
+    { permitted: deposit, spender: factoryAddress, nonce, deadline },
+    permit2Address,
+    chainId,
+    witness,
+  );
 };
 
 /**
@@ -192,46 +151,3 @@ export const validateAllocations = (allocations: TargetAllocation[]): void => {
     throw new Error('Duplicate instruments in allocations');
   }
 };
-
-/**
- * Witness utilities for Permit2 signatures
- *
- * TODO: Witness parameters are preliminary and may need adjustments
- * based on final contract requirements. See createAndDeposit.ts for reference.
- */
-
-/**
- * Witness type definition for EIP-712
- * This defines the structure of the witness data
- */
-export const WITNESS_TYPE = {
-  CreateWallet: [
-    { name: 'owner', type: 'string' },
-    { name: 'chainId', type: 'uint256' },
-    { name: 'factory', type: 'address' },
-  ],
-};
-
-/**
- * Witness type string for Permit2
- * Format: "[WitnessType] witness)[WitnessTypeDefinition]TokenPermissions(address token,uint256 amount)"
- */
-export const WITNESS_TYPE_STRING =
-  'CreateWallet witness)CreateWallet(string owner,uint256 chainId,address factory)TokenPermissions(address token,uint256 amount)' as const;
-
-/**
- * Create witness data object
- *
- * @param owner - Agoric smart wallet owner address
- * @param chainId - EVM chain ID
- * @param factory - Factory contract address
- */
-export const createWitnessData = (
-  owner: string,
-  chainId: bigint,
-  factory: `0x${string}`,
-) => ({
-  owner,
-  chainId,
-  factory,
-});

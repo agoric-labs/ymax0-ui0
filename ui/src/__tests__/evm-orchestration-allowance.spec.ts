@@ -11,7 +11,7 @@
 
 import { test } from 'vitest';
 import { createPublicClient, createWalletClient, http } from 'viem';
-import { sepolia } from 'viem/chains';
+import { arbitrumSepolia as sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ensurePermit2Allowance } from '../evm-orchestration';
 
@@ -23,7 +23,7 @@ test('ensurePermit2Allowance should query allowance from publicClient', async ({
   const account = privateKeyToAccount(testPrivateKey);
 
   // Create public, wallet clients
-  const transport = http('https://ethereum-sepolia-rpc.publicnode.com');
+  const transport = http('https://arbitrum-sepolia-rpc.publicnode.com');
   const client = {
     public: createPublicClient({ transport, chain: sepolia }),
     wallet: createWalletClient({ transport, chain: sepolia, account }),

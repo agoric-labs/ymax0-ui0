@@ -12,7 +12,7 @@ import {
   type Transport,
   type WalletClient,
 } from 'viem';
-import { sepolia } from 'viem/chains';
+import { arbitrumSepolia as sepolia } from 'viem/chains';
 
 interface Props {
   address: string;

@@ -11,6 +11,15 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
   },
+  // Enable esbuild to transform TypeScript files from @agoric packages
+  optimizeDeps: {
+    esbuildOptions: {
+      // Allow TypeScript files from node_modules
+      loader: {
+        '.ts': 'ts',
+      },
+    },
+  },
   test: {
     globals: true,
     environment: 'happy-dom',

@@ -5,44 +5,27 @@
  * 2. OpenPortfolio intent with target allocations
  */
 
-import {
-  PermitTransferFromData,
-  SignatureTransfer,
-  type PermitTransferFrom as Permit2Transfer,
-} from '@uniswap/permit2-sdk';
 import { useState } from 'react';
-import { TypedDataEncoder } from 'ethers';
-import type {
-  Account,
-  Chain,
-  Transport,
-  TypedDataDomain,
-  WalletClient,
-} from 'viem';
-import { sepolia } from 'viem/chains';
-import type {
-  SignedOpenPortfolio,
-  TargetAllocation,
-} from '../evm-portfolio-types';
+import type { Account, Chain, Transport, WalletClient } from 'viem';
+
+import { arbitrumSepolia as sepolia } from 'viem/chains';
+import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
+import type { SignedMessage, TargetAllocation } from '../evm-portfolio-types';
 import {
-  createWitnessData,
-  WITNESS_TYPE,
-  WITNESS_TYPE_STRING,
-  makeOpenPortfolioSignedData,
+  createOpenPortfolioMessage,
   parseUSDCAmount,
   SEPOLIA_CONTRACTS,
   validateAllocations,
 } from '../open-portfolio-eip712';
+import type { YmaxPermitWitnessTransferFromData } from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
 
 // Constants
 const ONE_HOUR_IN_SECONDS = 3600n;
 
-type Permit2TypesToViem = Record<string, Array<{ name: string; type: string }>>;
-
 interface Props {
   userAddress: `0x${string}`;
   walletClient: WalletClient<Transport, Chain, Account>;
-  onSigned: (result: SignedOpenPortfolio) => void;
+  onSigned: (result: SignedMessage) => void;
 }
 
 const POOL_OPTIONS = [
@@ -141,107 +124,36 @@ export function OpenPortfolioForm({
         return;
       }
 
-      // Step 1: Sign Permit2 PermitTransferFrom
-      setCurrentStep('Signing Permit2 (1/2)...');
+      // Sign Permit2 PermitBatchWitnessTransferFrom
+      setCurrentStep('Signing Permit2...');
 
       const deadline =
         BigInt(Math.floor(Date.now() / 1000)) + ONE_HOUR_IN_SECONDS;
       const nonce = BigInt(`${timeStamp}`.replace(/[^0-9]/g, ''));
 
-      const permit: Permit2Transfer = {
-        permitted: {
-          token: SEPOLIA_CONTRACTS.USDC,
-          amount: amountInSmallestUnit,
-        },
-        spender: SEPOLIA_CONTRACTS.FACTORY,
-        nonce,
-        deadline,
-      };
-
-      const witnessData = createWitnessData(
-        'agoric1temporary',
-        BigInt(currentChainId),
-        SEPOLIA_CONTRACTS.FACTORY,
-      );
-
-      const {
-        domain: permit2Domain,
-        types: permit2Types,
-        values: permit2Values,
-      } = SignatureTransfer.getPermitData(
-        permit,
-        SEPOLIA_CONTRACTS.PERMIT2,
-        currentChainId,
-        {
-          witness: witnessData,
-          witnessTypeName: 'CreateWallet',
-          witnessType: WITNESS_TYPE,
-        },
-      ) as PermitTransferFromData;
-
-      // Hash witness for contract payload
-      const witness = TypedDataEncoder.hashStruct(
-        'CreateWallet',
-        WITNESS_TYPE,
-        witnessData,
-      ) as `0x${string}`;
-
-      console.log('Permit2 signature request:', {
-        domain: permit2Domain,
-        types: permit2Types,
-        values: permit2Values,
-      });
-
-      const permitSignature = await walletClient.signTypedData({
-        account: userAddress as `0x${string}`,
-        domain: permit2Domain as TypedDataDomain,
-        types: permit2Types as Permit2TypesToViem,
-        primaryType: 'PermitWitnessTransferFrom',
-        message: permit2Values as unknown as Record<string, unknown>,
-      });
-
-      console.log('Permit2 signature received:', permitSignature);
-
-      // Step 2: Sign OpenPortfolio intent
-      setCurrentStep('Signing OpenPortfolio intent (2/2)...');
-
-      const toSign = makeOpenPortfolioSignedData(
-        userAddress,
+      const data = createOpenPortfolioMessage(
         amountInSmallestUnit,
         allocations,
-        { nonce, deadline },
+        { nonce, deadline, chainId: currentChainId },
       );
 
-      console.log('OpenPortfolio intent signature request:', toSign);
+      console.log('Permit2 signature request:', data);
 
-      // Cast to viem-compatible types
-      // The intentTypes are already in the correct format but TS needs explicit typing
-      const intentSignature = await walletClient.signTypedData(toSign);
+      const permitSignature = await walletClient.signTypedData({
+        account: userAddress,
+        ...data,
+      });
 
-      console.log('OpenPortfolio intent signature received:', intentSignature);
+      const signedData = {
+        ...data,
+        signature: permitSignature,
+      } satisfies WithSignature<
+        YmaxPermitWitnessTransferFromData<'OpenPortfolio'>
+      >;
 
-      // Combine results
-      const result: SignedOpenPortfolio = {
-        permitSignature,
-        intentSignature,
-        permit: {
-          permitted: [
-            {
-              token: permit.permitted.token,
-              amount: permit.permitted.amount.toString(),
-            },
-          ],
-          spender: permit.spender,
-          nonce: permit.nonce.toString(),
-          deadline: permit.deadline.toString(),
-        },
-        intent: toSign.message,
-        witness,
-        witnessTypeString: WITNESS_TYPE_STRING,
-      };
-
+      console.log('Permit2 signature received:', permitSignature);
       setCurrentStep('');
-      onSigned(result);
+      onSigned(signedData);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Failed to sign messages';
@@ -263,17 +175,17 @@ export function OpenPortfolioForm({
           marginBottom: '20px',
           padding: '12px',
           background:
-            currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID
+            BigInt(currentChainId) === BigInt(SEPOLIA_CONTRACTS.CHAIN_ID)
               ? '#d1ecf1'
               : '#fff3cd',
-          border: `1px solid ${currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID ? '#bee5eb' : '#ffeeba'}`,
+          border: `1px solid ${BigInt(currentChainId) === BigInt(SEPOLIA_CONTRACTS.CHAIN_ID) ? '#bee5eb' : '#ffeeba'}`,
           borderRadius: '4px',
           fontSize: '14px',
         }}
       >
         <strong>Network:</strong> {networkName} (Chain ID:{' '}
         {currentChainId ?? 'detecting...'})
-        {currentChainId !== SEPOLIA_CONTRACTS.CHAIN_ID &&
+        {BigInt(currentChainId) !== BigInt(SEPOLIA_CONTRACTS.CHAIN_ID) &&
           currentChainId !== null && (
             <div style={{ marginTop: '8px', color: '#856404' }}>
               ⚠️ Please switch to <strong>Sepolia testnet</strong> to use this
