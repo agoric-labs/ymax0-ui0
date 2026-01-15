@@ -175,17 +175,17 @@ export function OpenPortfolioForm({
           marginBottom: '20px',
           padding: '12px',
           background:
-            currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID
+            BigInt(currentChainId) === BigInt(SEPOLIA_CONTRACTS.CHAIN_ID)
               ? '#d1ecf1'
               : '#fff3cd',
-          border: `1px solid ${currentChainId === SEPOLIA_CONTRACTS.CHAIN_ID ? '#bee5eb' : '#ffeeba'}`,
+          border: `1px solid ${BigInt(currentChainId) === BigInt(SEPOLIA_CONTRACTS.CHAIN_ID) ? '#bee5eb' : '#ffeeba'}`,
           borderRadius: '4px',
           fontSize: '14px',
         }}
       >
         <strong>Network:</strong> {networkName} (Chain ID:{' '}
         {currentChainId ?? 'detecting...'})
-        {currentChainId !== SEPOLIA_CONTRACTS.CHAIN_ID &&
+        {BigInt(currentChainId) !== BigInt(SEPOLIA_CONTRACTS.CHAIN_ID) &&
           currentChainId !== null && (
             <div style={{ marginTop: '8px', color: '#856404' }}>
               ⚠️ Please switch to <strong>Sepolia testnet</strong> to use this
