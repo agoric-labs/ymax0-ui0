@@ -3,15 +3,21 @@ import React from 'react';
 interface CreatorFacetCardProps {
   plannerAddress: string;
   setPlannerAddress: (value: string) => void;
+  resolverAddress: string;
+  setResolverAddress: (value: string) => void;
   savedEntries: Set<string>;
   onDeliverPlannerInvitation: () => void;
+  onDeliverResolverInvitation: () => void;
 }
 
 const CreatorFacetCard: React.FC<CreatorFacetCardProps> = ({
   plannerAddress,
   setPlannerAddress,
+  resolverAddress,
+  setResolverAddress,
   savedEntries,
   onDeliverPlannerInvitation,
+  onDeliverResolverInvitation,
 }) => {
   return (
     <div style={{ border: '2px solid #28a745', padding: '1rem', borderRadius: '8px', backgroundColor: '#f8fff8' }}>
@@ -21,8 +27,8 @@ const CreatorFacetCard: React.FC<CreatorFacetCardProps> = ({
       </p>
 
       {/* Deliver Planner Invitation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ minWidth: '140px', fontWeight: 'bold' }}>Deliver Invitation:</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <label style={{ minWidth: '140px', fontWeight: 'bold' }}>Planner Invitation:</label>
         <input
           type="text"
           value={plannerAddress}
@@ -38,6 +44,38 @@ const CreatorFacetCard: React.FC<CreatorFacetCardProps> = ({
         />
         <button 
           onClick={onDeliverPlannerInvitation}
+          style={{
+            padding: '0.4rem 0.8rem',
+            backgroundColor: '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.9em'
+          }}
+        >
+          Deliver
+        </button>
+      </div>
+
+      {/* Deliver Resolver Invitation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ minWidth: '140px', fontWeight: 'bold' }}>Resolver Invitation:</label>
+        <input
+          type="text"
+          value={resolverAddress}
+          onChange={(e) => setResolverAddress(e.target.value)}
+          placeholder="Resolver address (agoric1...)"
+          style={{ 
+            flex: 1,
+            padding: '0.4rem', 
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            fontSize: '0.9em'
+          }}
+        />
+        <button 
+          onClick={onDeliverResolverInvitation}
           style={{
             padding: '0.4rem 0.8rem',
             backgroundColor: '#28a745',
