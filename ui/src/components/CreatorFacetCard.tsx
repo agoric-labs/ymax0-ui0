@@ -5,6 +5,7 @@ interface CreatorFacetCardProps {
   setPlannerAddress: (value: string) => void;
   savedEntries: Set<string>;
   onDeliverPlannerInvitation: () => void;
+  onCreateVault: () => void;
 }
 
 const CreatorFacetCard: React.FC<CreatorFacetCardProps> = ({
@@ -12,6 +13,7 @@ const CreatorFacetCard: React.FC<CreatorFacetCardProps> = ({
   setPlannerAddress,
   savedEntries,
   onDeliverPlannerInvitation,
+  onCreateVault,
 }) => {
   return (
     <div style={{ border: '2px solid #28a745', padding: '1rem', borderRadius: '8px', backgroundColor: '#f8fff8' }}>
@@ -49,6 +51,27 @@ const CreatorFacetCard: React.FC<CreatorFacetCardProps> = ({
           }}
         >
           Deliver
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem' }}>
+        <label style={{ minWidth: '140px', fontWeight: 'bold' }}>Create Vault:</label>
+        <div style={{ flex: 1, color: '#666', fontSize: '0.9em' }}>
+          60% Aave_Base / 40% Compound_Base (spike default)
+        </div>
+        <button
+          onClick={onCreateVault}
+          style={{
+            padding: '0.4rem 0.8rem',
+            backgroundColor: '#0d6efd',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.9em',
+          }}
+        >
+          Create
         </button>
       </div>
     </div>

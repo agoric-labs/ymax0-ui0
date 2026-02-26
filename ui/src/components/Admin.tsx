@@ -268,6 +268,45 @@ const Admin: React.FC<AdminProps> = ({
     }
   };
 
+  const handleCreateVault = async () => {
+    if (!wallet || !keplr || !chainId || !watcherRef.current) {
+      alert('Wallet, Keplr, chain ID, or watcher not available');
+      return;
+    }
+
+    const targetAllocation = {
+      Aave_Base: 6000n,
+      Compound_Base: 4000n,
+    };
+
+    try {
+      const { target, tools } = reifyWalletEntry<{
+        createVault: (allocation: Record<string, bigint>) => Promise<{
+          portfolioId: number;
+          storagePath: string;
+        }>;
+      }>({
+        targetName: 'creatorFacet',
+        wallet,
+        keplr,
+        chainId,
+        marshaller: watcherRef.current.marshaller,
+        rpcEndpoint: ENDPOINTS.RPC,
+      });
+
+      trackInvocation(tools, 'createVault', 'creatorFacet');
+      const result = await target.createVault(targetAllocation);
+      alert(
+        `Vault creation submitted. portfolioId=${result.portfolioId}, storagePath=${result.storagePath}`,
+      );
+    } catch (error) {
+      console.error('Create vault failed:', error);
+      alert(
+        `Create vault failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  };
+
   const handleRedeemInvitation = async (description: string, saveName: string, replace: boolean) => {
     if (!wallet || !keplr || !chainId || !watcherRef.current) {
       alert('Wallet, Keplr, chain ID, or watcher not available');
@@ -653,6 +692,7 @@ const Admin: React.FC<AdminProps> = ({
           setPlannerAddress={setPlannerAddress}
           savedEntries={savedEntries}
           onDeliverPlannerInvitation={handleDeliverPlannerInvitation}
+          onCreateVault={handleCreateVault}
         />
 
         {pendingInvocations.size > 0 && (
