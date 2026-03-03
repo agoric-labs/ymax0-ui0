@@ -14,11 +14,33 @@ import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
 
 export type { TargetAllocation };
 
+export type DelegateAllocationMessage = {
+  domain: {
+    name: 'Ymax';
+    version: '1';
+    chainId: bigint | number;
+    verifyingContract: Address;
+  };
+  types: {
+    EIP712Domain: readonly { name: string; type: string }[];
+    DelegateAllocation: readonly { name: string; type: string }[];
+  };
+  primaryType: 'DelegateAllocation';
+  message: {
+    address: Address;
+    portfolio: bigint;
+    nonce: bigint;
+    deadline: bigint;
+  };
+  signature: EVM_T<'bytes'>;
+};
+
 export type SignedMessage =
   | WithSignature<YmaxPermitWitnessTransferFromData<'OpenPortfolio'>>
   | WithSignature<YmaxPermitWitnessTransferFromData<'Rebalance'>>
   | WithSignature<YmaxStandaloneOperationData<'Rebalance'>>
   | WithSignature<YmaxPermitWitnessTransferFromData<'Deposit'>>
+  | DelegateAllocationMessage
   | never;
 
 /**
