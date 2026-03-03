@@ -14,6 +14,7 @@ import {
   type WalletClient,
 } from 'viem';
 import { type CopyRecord, type Passable, makeMarshal } from '@endo/marshal';
+import { DelegateAllocationForm } from './DelegateAllocationForm';
 import { EVMWalletConnection } from './EVMWalletConnection';
 import { OpenPortfolioForm } from './OpenPortfolioForm';
 import type {
@@ -226,6 +227,7 @@ const mockEVMHandler = {
 };
 
 export function EVMWalletPage() {
+  const [mode, setMode] = useState<'open' | 'delegate'>('open');
   const [evmAddress, setEvmAddress] = useState<`0x${string}` | ''>('');
   const [walletClient, setWalletClient] = useState<WalletClient<
     Transport,
@@ -233,6 +235,7 @@ export function EVMWalletPage() {
     Account
   > | null>(null);
   const [signedData, setSignedData] = useState<SignedMessage | null>(null);
+  const [signedOperation, setSignedOperation] = useState<string>('');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [txHash, setTxHash] = useState<string>('');
@@ -258,7 +261,20 @@ export function EVMWalletPage() {
   };
 
   const handleSigned = async (result: SignedMessage) => {
+    if (result.primaryType === 'DelegateAllocation') {
+      setSignedData(result);
+      setSignedOperation('DelegateAllocation');
+      setSubmitted(false);
+      setTxHash('');
+      setProgressLog([]);
+      setError('');
+      return;
+    }
+    const details = (await extractOperationDetailsFromSignedData(result)) as
+      | FullMessageDetails
+      | never;
     setSignedData(result);
+    setSignedOperation(details.operation);
     setSubmitted(false);
     setTxHash('');
     setProgressLog([]);
@@ -344,7 +360,7 @@ export function EVMWalletPage() {
     }
   };
 
-  const handleMockSubmit = () => {
+  const handleMockSubmit = async () => {
     if (!signedData) return;
 
     setProgressLog([]);
@@ -371,7 +387,24 @@ export function EVMWalletPage() {
     addProgress('Note: Nothing in this repository is production code.');
     addProgress('The "Submit to Sepolia (Direct)" button MOCKS steps 1-5.');
 
-    mockEVMHandler.handleOpenPortfolio(signedData);
+    if (signedData.primaryType === 'DelegateAllocation') {
+      addProgress('DelegateAllocation is standalone (no Permit2 payload).');
+      addProgress('Expected production flow: UI -> EMS -> EMH -> portfolio');
+      addProgress(
+        `Delegate operation for portfolio ${signedData.message.portfolio} to ${signedData.message.address}`,
+      );
+      console.log('DelegateAllocation signed payload:', signedData);
+    } else {
+      const details = (await extractOperationDetailsFromSignedData(
+        signedData,
+      )) as FullMessageDetails;
+      if (details.operation === 'OpenPortfolio') {
+        mockEVMHandler.handleOpenPortfolio(signedData);
+      } else {
+        addProgress(`Unsupported operation in mock flow: ${details.operation}`);
+        console.log('Unsupported signed payload:', signedData);
+      }
+    }
 
     setSubmitted(true);
   };
@@ -387,21 +420,72 @@ export function EVMWalletPage() {
     >
       <div style={{ marginBottom: '30px' }}>
         <h1 style={{ marginBottom: '10px' }}>Open Portfolio with EVM Wallet</h1>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+          <button
+            onClick={() => {
+              setMode('open');
+              setSignedData(null);
+              setSignedOperation('');
+              setSubmitted(false);
+              setTxHash('');
+              setProgressLog([]);
+              setError('');
+            }}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              background: mode === 'open' ? '#007bff' : 'white',
+              color: mode === 'open' ? 'white' : '#333',
+              cursor: 'pointer',
+            }}
+          >
+            Open Portfolio
+          </button>
+          <button
+            onClick={() => {
+              setMode('delegate');
+              setSignedData(null);
+              setSignedOperation('');
+              setSubmitted(false);
+              setTxHash('');
+              setProgressLog([]);
+              setError('');
+            }}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              background: mode === 'delegate' ? '#007bff' : 'white',
+              color: mode === 'delegate' ? 'white' : '#333',
+              cursor: 'pointer',
+            }}
+          >
+            Delegate Allocation
+          </button>
+        </div>
         <p style={{ color: '#666', fontSize: '14px' }}>
-          This page demonstrates EIP-712 signature collection for opening a Ymax
-          portfolio using an EVM wallet like MetaMask. You'll be prompted to
-          sign two messages:
+          This page demonstrates EIP-712 signature collection for Ymax
+          operations using an EVM wallet like MetaMask.
         </p>
-        <ol style={{ color: '#666', fontSize: '14px', marginTop: '10px' }}>
-          <li>
-            <strong>Permit2 Transfer:</strong> Allows the Factory contract to
-            move your USDC
-          </li>
-          <li>
-            <strong>OpenPortfolio Intent:</strong> Specifies deposit amount and
-            target allocations
-          </li>
-        </ol>
+        {mode === 'open' && (
+          <ol style={{ color: '#666', fontSize: '14px', marginTop: '10px' }}>
+            <li>
+              <strong>Permit2 Transfer:</strong> Allows the Factory contract to
+              move your USDC
+            </li>
+            <li>
+              <strong>OpenPortfolio Intent:</strong> Specifies deposit amount
+              and target allocations
+            </li>
+          </ol>
+        )}
+        {mode === 'delegate' && (
+          <p style={{ color: '#666', fontSize: '14px', marginTop: '10px' }}>
+            Delegate mode creates a standalone <code>DelegateAllocation</code>{' '}
+            message (no Permit2).
+          </p>
+        )}
         <p
           style={{
             color: '#856404',
@@ -421,7 +505,7 @@ export function EVMWalletPage() {
         </p>
       </div>
 
-      {usdcBalance !== null && (
+      {mode === 'open' && usdcBalance !== null && (
         <div
           style={{
             marginBottom: '20px',
@@ -450,8 +534,15 @@ export function EVMWalletPage() {
           onClientChange={setWalletClient}
         />
 
-        {evmAddress && walletClient && (
+        {evmAddress && walletClient && mode === 'open' && (
           <OpenPortfolioForm
+            userAddress={evmAddress}
+            walletClient={walletClient}
+            onSigned={handleSigned}
+          />
+        )}
+        {evmAddress && walletClient && mode === 'delegate' && (
+          <DelegateAllocationForm
             userAddress={evmAddress}
             walletClient={walletClient}
             onSigned={handleSigned}
@@ -476,7 +567,7 @@ export function EVMWalletPage() {
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 onClick={handleSubmitDirect}
-                disabled={submitting}
+                disabled={submitting || signedOperation !== 'OpenPortfolio'}
                 style={{
                   padding: '10px 20px',
                   fontSize: '14px',
@@ -489,7 +580,11 @@ export function EVMWalletPage() {
                   opacity: submitting ? 0.6 : 1,
                 }}
               >
-                {submitting ? 'Submitting...' : 'Submit to Sepolia (Direct)'}
+                {signedOperation === 'OpenPortfolio'
+                  ? submitting
+                    ? 'Submitting...'
+                    : 'Submit to Sepolia (Direct)'
+                  : 'Direct Submit (OpenPortfolio only)'}
               </button>
               <button
                 onClick={handleMockSubmit}
