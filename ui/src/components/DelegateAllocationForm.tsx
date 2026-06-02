@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  isAddress,
   type Account,
   type Chain,
   type Transport,
@@ -28,7 +27,8 @@ export function DelegateAllocationForm({
   onSigned,
 }: Props) {
   const [portfolioId, setPortfolioId] = useState('1');
-  const [delegateAddress, setDelegateAddress] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [canSetAllocation, setCanSetAllocation] = useState(true);
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,8 +44,8 @@ export function DelegateAllocationForm({
       if (!/^\d+$/.test(portfolioId) || BigInt(portfolioId) <= 0n) {
         throw new Error('Portfolio ID must be a positive integer');
       }
-      if (!isAddress(delegateAddress)) {
-        throw new Error('Delegate address must be a valid EVM address');
+      if (!/^agoric1[0-9a-z]+$/.test(accountHolder)) {
+        throw new Error('Account holder must be a valid agoric1 address');
       }
 
       const nonce = BigInt(`${Date.now()}`);
@@ -67,16 +67,18 @@ export function DelegateAllocationForm({
             { name: 'verifyingContract', type: 'address' },
           ] as const,
           DelegateAllocation: [
-            { name: 'address', type: 'address' },
+            { name: 'accountHolder', type: 'string' },
             { name: 'portfolio', type: 'uint256' },
+            { name: 'canSetAllocation', type: 'bool' },
             { name: 'nonce', type: 'uint256' },
             { name: 'deadline', type: 'uint256' },
           ] as const,
         },
         primaryType: 'DelegateAllocation' as const,
         message: {
+          accountHolder,
           portfolio: BigInt(portfolioId),
-          address: delegateAddress as `0x${string}`,
+          canSetAllocation,
           nonce,
           deadline,
         },
@@ -102,7 +104,8 @@ export function DelegateAllocationForm({
     <div style={{ marginBottom: '30px' }}>
       <h2>Delegate Allocation Control</h2>
       <p style={{ color: '#666', fontSize: '14px' }}>
-        Sign a <code>DelegateAllocation</code> standalone EIP-712 operation.
+        Sign a standalone <code>DelegateAllocation</code> EIP-712 operation
+        with a camelCase field named <code>accountHolder</code>.
       </p>
 
       <div style={{ marginBottom: '14px' }}>
@@ -125,17 +128,34 @@ export function DelegateAllocationForm({
         <label
           style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
         >
-          Delegate EVM Address:
+          Account Holder Address:
         </label>
         <input
           type="text"
-          value={delegateAddress}
-          onChange={e => setDelegateAddress(e.target.value.trim())}
+          value={accountHolder}
+          onChange={e => setAccountHolder(e.target.value.trim())}
           disabled={signing}
-          placeholder="0x..."
+          placeholder="agoric1..."
           style={{ padding: '8px', width: '100%', maxWidth: '480px' }}
         />
       </div>
+
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '14px',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={canSetAllocation}
+          onChange={e => setCanSetAllocation(e.target.checked)}
+          disabled={signing}
+        />
+        Allow allocation updates
+      </label>
 
       {error && (
         <div
