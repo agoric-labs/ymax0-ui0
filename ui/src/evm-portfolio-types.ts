@@ -7,10 +7,10 @@ import type {
   TargetAllocation,
   YmaxPermitWitnessTransferFromData,
   YmaxStandaloneOperationData,
-} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
-import type { PermitTransferFrom } from '@agoric/orchestration/src/utils/permit2.ts';
+} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.js';
+import type { PermitTransferFrom } from '@agoric/orchestration/src/utils/permit2.js';
 import type { Bech32Address } from '@agoric/cosmic-proto/address-hooks.js';
-import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
+import type { WithSignature } from '@agoric/orchestration/src/utils/viem.js';
 
 export type { TargetAllocation };
 
@@ -27,8 +27,9 @@ export type DelegateAllocationMessage = {
   };
   primaryType: 'DelegateAllocation';
   message: {
-    address: Address;
+    accountHolder: string;
     portfolio: bigint;
+    canSetAllocation: boolean;
     nonce: bigint;
     deadline: bigint;
   };

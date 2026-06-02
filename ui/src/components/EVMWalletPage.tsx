@@ -31,8 +31,8 @@ import { useSepoliaPublicClient } from '../utils/sepoliaPublicClient.ts';
 import type {
   YmaxPermitWitnessTransferFromData,
   YmaxStandaloneOperationData,
-} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.ts';
-import type { WithSignature } from '@agoric/orchestration/src/utils/viem.ts';
+} from '@agoric/portfolio-api/src/evm-wallet/eip712-messages.js';
+import type { WithSignature } from '@agoric/orchestration/src/utils/viem.js';
 import {
   extractOperationDetailsFromSignedData,
   type FullMessageDetails,
@@ -62,6 +62,65 @@ type InvokeEntryMessage = {
 type InvokeStoreEntryAction = {
   method: 'invokeEntry';
   message: InvokeEntryMessage;
+};
+
+type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+type EvmOperationSubmitResponse = {
+  id: number;
+  owner: string;
+  status: 'transacted' | 'failed';
+  txHash: string | null;
+  error: string | null;
+  timestamp: string;
+};
+
+const ESCAPE_CHARS = /^[!"#$%&'()*+,-]/;
+const DEFAULT_EMS_BASE_URL = 'https://dev0.ymax.app';
+
+const toSmallcaps = (value: unknown): JsonValue => {
+  if (value === undefined) return '#undefined';
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) return '#NaN';
+    if (value === Infinity) return '#Infinity';
+    if (value === -Infinity) return '#-Infinity';
+    if (Object.is(value, -0)) return 0;
+    return value;
+  }
+  if (typeof value === 'bigint') return value >= 0n ? `+${value}` : `${value}`;
+  if (typeof value === 'string')
+    return ESCAPE_CHARS.test(value) ? `!${value}` : value;
+  if (typeof value === 'boolean' || value === null) return value;
+  if (Array.isArray(value)) return value.map(toSmallcaps);
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, toSmallcaps(v)]),
+    );
+  }
+  throw new Error(`unsupported value for smallcaps: ${String(value)}`);
+};
+
+const isEvmOperationSubmitResponse = (
+  value: unknown,
+): value is EvmOperationSubmitResponse => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const rec = value as Record<string, unknown>;
+  return (
+    typeof rec.id === 'number' &&
+    typeof rec.owner === 'string' &&
+    (rec.status === 'transacted' || rec.status === 'failed') &&
+    (typeof rec.txHash === 'string' || rec.txHash === null) &&
+    (typeof rec.error === 'string' || rec.error === null) &&
+    typeof rec.timestamp === 'string'
+  );
 };
 
 /**
@@ -388,10 +447,11 @@ export function EVMWalletPage() {
     addProgress('The "Submit to Sepolia (Direct)" button MOCKS steps 1-5.');
 
     if (signedData.primaryType === 'DelegateAllocation') {
-      addProgress('DelegateAllocation is standalone (no Permit2 payload).');
-      addProgress('Expected production flow: UI -> EMS -> EMH -> portfolio');
       addProgress(
-        `Delegate operation for portfolio ${signedData.message.portfolio} to ${signedData.message.address}`,
+        'DelegateAllocation is a standalone operation (no Permit2 payload).',
+      );
+      addProgress(
+        `camelCase field accountHolder=${signedData.message.accountHolder}`,
       );
       console.log('DelegateAllocation signed payload:', signedData);
     } else {
@@ -407,6 +467,74 @@ export function EVMWalletPage() {
     }
 
     setSubmitted(true);
+  };
+
+  const handleSubmitStandaloneToEms = async () => {
+    if (!signedData || signedData.primaryType !== 'DelegateAllocation') {
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    setProgressLog([]);
+    setTxHash('');
+
+    try {
+      const emsBaseUrl =
+        import.meta.env.VITE_YDS_PROXY_TARGET ?? DEFAULT_EMS_BASE_URL;
+      const endpoint = new URL('/evm-operations', emsBaseUrl);
+      addProgress(`Submitting DelegateAllocation to EMS: ${endpoint}`);
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(toSmallcaps(signedData)),
+      });
+
+      if (!response.ok) {
+        const rawBody = await response.text();
+        let bodyForMessage = rawBody;
+        try {
+          const parsed = JSON.parse(rawBody);
+          bodyForMessage = JSON.stringify(parsed);
+        } catch {
+          // Keep raw body when it isn't JSON.
+        }
+        throw new Error(
+          `EMS HTTP ${response.status} ${response.statusText}; body: ${bodyForMessage || '<empty>'}`,
+        );
+      }
+
+      const result = await response.json();
+      if (!isEvmOperationSubmitResponse(result)) {
+        throw new Error('Unexpected EMS response shape');
+      }
+
+      if (result.status === 'failed') {
+        throw new Error(result.error ?? 'EMS submission failed');
+      }
+
+      if (result.txHash) {
+        setTxHash(result.txHash);
+        addProgress(
+          `EMS accepted operation ${result.id} with tx ${result.txHash}`,
+        );
+      } else {
+        addProgress(`EMS accepted operation ${result.id}`);
+      }
+
+      setSubmitted(true);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to submit standalone operation to EMS';
+      setError(message);
+      addProgress(`✗ Error: ${message}`);
+      console.error('Standalone EMS submission error:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -483,7 +611,7 @@ export function EVMWalletPage() {
         {mode === 'delegate' && (
           <p style={{ color: '#666', fontSize: '14px', marginTop: '10px' }}>
             Delegate mode creates a standalone <code>DelegateAllocation</code>{' '}
-            message (no Permit2).
+            message with a camelCase field named <code>accountHolder</code>.
           </p>
         )}
         <p
@@ -587,7 +715,11 @@ export function EVMWalletPage() {
                   : 'Direct Submit (OpenPortfolio only)'}
               </button>
               <button
-                onClick={handleMockSubmit}
+                onClick={
+                  signedOperation === 'DelegateAllocation'
+                    ? handleSubmitStandaloneToEms
+                    : handleMockSubmit
+                }
                 disabled={submitting}
                 style={{
                   padding: '10px 20px',
@@ -601,7 +733,11 @@ export function EVMWalletPage() {
                   opacity: submitting ? 0.6 : 1,
                 }}
               >
-                View Mock Flow (Console)
+                {signedOperation === 'DelegateAllocation'
+                  ? submitting
+                    ? 'Submitting to EMS...'
+                    : 'Submit DelegateAllocation to EMS'
+                  : 'View Mock Flow (Console)'}
               </button>
             </div>
           </div>
